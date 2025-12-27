@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="VSANDBOXWIN.vcxproj" Id="1ccb38c8-90e9-41ae-b18d-6558659da6e9" />
+</Solution>
