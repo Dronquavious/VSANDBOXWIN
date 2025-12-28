@@ -857,13 +857,6 @@ Texture2D Game::GenSnowTexture(int size)
 			snow.g = Clamp(snow.g + variation, 0, 255);
 			snow.b = Clamp(snow.b + variation, 0, 255);
 
-			// yiny sparkles / ice flecks
-			if (GetRandomValue(0, 100) < 4)
-			{
-				snow.r += 5;
-				snow.g += 5;
-				snow.b += 8;
-			}
 
 			// VERY soft edge (much weaker than sand)
 			int edgeDist = MIN(
@@ -897,7 +890,6 @@ Texture2D Game::GenSnowTexture(int size)
 	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
 	return tex;
 }
-
 
 Texture2D Game::GenCactusTexture(int size)
 {
