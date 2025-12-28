@@ -3,7 +3,7 @@
 This is a high-performance C++ voxel engine built from scratch using **Raylib**.
 
 ## 📖 Backstory
-This project is an optimized continuation of my original [Mac/Linux Voxel Sandbox]([https://github.com/Dronquavious/VSANDBOX]).
+This project is an optimized continuation of my original [Mac/Linux Voxel Sandbox](https://github.com/Dronquavious/VSANDBOX)
 
 As the complexity of the engine grew (infinite chunks, procedural generation, voxel meshing), the hardware limitations on my previous machine began to bottleneck performance. This repository represents the migration to a Windows environment to leverage better hardware acceleration and Visual Studio's profiling tools.
 
