@@ -45,7 +45,7 @@ private:
 
     // Resources (Assets)
     Texture2D texDirt, texStone, texWood, texGrass, texGrassSide;
-    Texture2D texSand, texBedrock, texLeaves;
+    Texture2D texSand, texBedrock, texLeaves, texSnow, texCactus;
 
     // Texture Generators
     Texture2D GenStoneTexture(int size);
@@ -56,6 +56,8 @@ private:
     Texture2D GenBedrockTexture(int size);
     Texture2D GenLeavesTexture(int size);
     Texture2D GenGrassSideTexture(int size);
+    Texture2D GenSnowTexture(int size);   
+    Texture2D GenCactusTexture(int size);
 
     // Game State
     int currentBlockId;
