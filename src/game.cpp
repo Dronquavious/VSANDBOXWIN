@@ -52,11 +52,12 @@ void Game::Init()
 	texStone = GenStoneTexture(BLOCK_TEX_SIZE);
 	texWood = GenWoodTexture(BLOCK_TEX_SIZE);
 	texGrass = GenGrassTexture(BLOCK_TEX_SIZE);
+	texGrassSide = GenGrassSideTexture(BLOCK_TEX_SIZE);
 	texSand = GenSandTexture(BLOCK_TEX_SIZE);
 	texBedrock = GenBedrockTexture(BLOCK_TEX_SIZE);
 	texLeaves = GenLeavesTexture(BLOCK_TEX_SIZE);
-	texGrassSide = GenGrassSideTexture(BLOCK_TEX_SIZE);
 	texSnow = GenSnowTexture(BLOCK_TEX_SIZE);
+	texSnowSide = GenSnowSideTexture(BLOCK_TEX_SIZE);
 	texCactus = GenCactusTexture(BLOCK_TEX_SIZE);
 
 	Mesh mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
@@ -194,7 +195,7 @@ void Game::draw()
 					   (unsigned char)(255 * brightness),
 					   (unsigned char)(255 * brightness), 255 };
 
-	Texture2D textures[11];
+	Texture2D textures[12];
 	textures[1] = texDirt;
 	textures[2] = texStone;
 	textures[3] = texWood;
@@ -205,6 +206,7 @@ void Game::draw()
 	textures[8] = texGrassSide;
 	textures[9] = texSnow;
 	textures[10] = texCactus;
+	textures[11] = texSnowSide;
 
 	// draw the infinite chunks
 	world.UpdateAndDraw(playerPosition, textures);
@@ -243,6 +245,7 @@ void Game::shutDown()
 	UnloadTexture(texGrassSide);
 	UnloadTexture(texSnow);
 	UnloadTexture(texCactus);
+	UnloadTexture(texSnowSide);
 	world.UnloadAll();
 }
 
@@ -506,7 +509,7 @@ void Game::DrawHand()
 		case 1: handTexture = texDirt; break;
 		case 2: handTexture = texStone; break;
 		case 3: handTexture = texWood; break;
-		case 4: handTexture = texGrassSide; break;
+		case 4: handTexture = texGrass; break;
 		case 5: handTexture = texSand; break;
 		case 6: handTexture = texBedrock; break;
 		case 7: handTexture = texLeaves; break;
@@ -589,7 +592,7 @@ void Game::DrawUI()
 			case 5: previewTex = texSand; break;
 			case 6: previewTex = texBedrock; break;
 			case 7: previewTex = texLeaves; break;
-			case 9: previewTex = texSnow; break;
+			case 9: previewTex = texSnowSide; break;
 			case 10: previewTex = texCactus; break;
 			default: previewTex = texDirt; break;
 			}
@@ -911,6 +914,34 @@ Texture2D Game::GenCactusTexture(int size)
 		int rx = GetRandomValue(0, size - 1);
 		int ry = GetRandomValue(0, size - 1);
 		ImageDrawPixel(&img, rx, ry, BLACK);
+	}
+
+	Texture2D tex = LoadTextureFromImage(img);
+	UnloadImage(img);
+	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+	return tex;
+}
+
+Texture2D Game::GenSnowSideTexture(int size)
+{
+	// generate Base Dirt (same as dirt texture)
+	Image img = GenImagePerlinNoise(size, size, 50, 50, 4.0f);
+	ImageColorBrightness(&img, -30);
+	ImageColorContrast(&img, -10);
+	ImageColorTint(&img, Color{ 150, 100, 70, 255 });
+
+	// draw Snow Top (White)
+	Color snowColor = { 240, 242, 245, 255 };
+
+	// draw top 1/3rd as solid snow
+	ImageDrawRectangle(&img, 0, 0, size, size / 3, snowColor);
+
+	// add "dripping" snow pixels
+	for (int i = 0; i < size; i++) {
+		if (GetRandomValue(0, 1)) {
+			ImageDrawPixel(&img, i, size / 3, snowColor);
+			if (GetRandomValue(0, 1)) ImageDrawPixel(&img, i, (size / 3) + 1, snowColor);
+		}
 	}
 
 	Texture2D tex = LoadTextureFromImage(img);
