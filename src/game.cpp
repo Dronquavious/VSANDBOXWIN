@@ -43,6 +43,8 @@ void Game::Init()
 	texBedrock = GenBedrockTexture(BLOCK_TEX_SIZE);
 	texLeaves = GenLeavesTexture(BLOCK_TEX_SIZE);
 	texGrassSide = GenGrassSideTexture(BLOCK_TEX_SIZE);
+	texSnow = GenSnowTexture(BLOCK_TEX_SIZE);
+	texCactus = GenCactusTexture(BLOCK_TEX_SIZE);
 
 	Mesh mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
 	blockModel = LoadModelFromMesh(mesh);
@@ -179,7 +181,7 @@ void Game::draw()
 					   (unsigned char)(255 * brightness),
 					   (unsigned char)(255 * brightness), 255 };
 
-	Texture2D textures[9];
+	Texture2D textures[11];
 	textures[1] = texDirt;
 	textures[2] = texStone;
 	textures[3] = texWood;
@@ -188,6 +190,8 @@ void Game::draw()
 	textures[6] = texBedrock;
 	textures[7] = texLeaves;
 	textures[8] = texGrassSide;
+	textures[9] = texSnow;
+	textures[10] = texCactus;
 
 	// draw the infinite chunks
 	world.UpdateAndDraw(playerPosition, textures);
@@ -224,6 +228,8 @@ void Game::shutDown()
 	UnloadTexture(texBedrock);
 	UnloadTexture(texLeaves);
 	UnloadTexture(texGrassSide);
+	UnloadTexture(texSnow);
+	UnloadTexture(texCactus);
 	world.UnloadAll();
 }
 
@@ -602,15 +608,54 @@ Texture2D Game::GenWoodTexture(int size)
 	return tex;
 }
 
+// new sand texture
 Texture2D Game::GenSandTexture(int size)
 {
-	Image img = GenImagePerlinNoise(size, size, 0, 0, 10.0f);
-	ImageColorBrightness(&img, +10);
-	ImageColorContrast(&img, -40);
-	ImageColorTint(&img, Color{ 215, 205, 160, 255 });
+	Image img = GenImageColor(size, size, BLANK);
+	Color* pixels = LoadImageColors(img);
 
-	Texture2D tex = LoadTextureFromImage(img);
-	UnloadImage(img);
+	for (int y = 0; y < size; y++)
+	{
+		for (int x = 0; x < size; x++)
+		{
+			Color sand = { 237, 229, 173, 255 };
+
+			int nx = x / 2;
+			int ny = y / 2;
+			unsigned int seed = nx * 49632 ^ ny * 325176;
+			seed = (seed << 13) ^ seed;
+
+			float noise = 1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589)
+				& 0x7fffffff) / 1073741824.0f;
+
+			noise = roundf(noise * 4.0f) / 4.0f;
+
+			int variation = (int)(noise * 8.0f);
+			sand.r = Clamp(sand.r + variation, 0, 255);
+			sand.g = Clamp(sand.g + variation, 0, 255);
+			sand.b = Clamp(sand.b + variation, 0, 255);
+
+			if (GetRandomValue(0, 100) < 6)
+			{
+				sand.r -= 10;
+				sand.g -= 10;
+				sand.b -= 15;
+			}
+
+			pixels[y * size + x] = sand;
+		}
+	}
+
+	Image newImg;
+	newImg.data = pixels;
+	newImg.width = size;
+	newImg.height = size;
+	newImg.mipmaps = 1;
+	newImg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+	Texture2D tex = LoadTextureFromImage(newImg);
+
+	UnloadImageColors(pixels);
 
 	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
 	return tex;
@@ -691,6 +736,41 @@ Texture2D Game::GenGrassSideTexture(int size)
 			ImageDrawPixel(&img, i, size / 3, grassColor);
 			if (GetRandomValue(0, 1)) ImageDrawPixel(&img, i, (size / 3) + 1, grassColor);
 		}
+	}
+
+	Texture2D tex = LoadTextureFromImage(img);
+	UnloadImage(img);
+	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+	return tex;
+}
+
+Texture2D Game::GenSnowTexture(int size)
+{
+	Image img = GenImagePerlinNoise(size, size, 50, 50, 4.0f);
+	ImageColorBrightness(&img, 50); // very bright
+	ImageColorContrast(&img, -50);  // low contrast (smooth)
+	ImageColorTint(&img, Color{ 240, 240, 255, 255 }); // White/Blue tint
+	Texture2D tex = LoadTextureFromImage(img);
+	UnloadImage(img);
+	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+	return tex;
+}
+
+Texture2D Game::GenCactusTexture(int size)
+{
+	// cactus is green with vertical stripes
+	Image img = GenImageColor(size, size, Color{ 60, 140, 60, 255 }); // Dark Green base
+
+	// draw lighter vertical stripes
+	for (int i = 2; i < size; i += 4) {
+		ImageDrawRectangle(&img, i, 0, 1, size, Color{ 80, 180, 80, 255 });
+	}
+
+	// add random thorns (dots)
+	for (int i = 0; i < 10; i++) {
+		int rx = GetRandomValue(0, size - 1);
+		int ry = GetRandomValue(0, size - 1);
+		ImageDrawPixel(&img, rx, ry, BLACK);
 	}
 
 	Texture2D tex = LoadTextureFromImage(img);
