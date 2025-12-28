@@ -474,7 +474,7 @@ void Game::DrawHand()
 		handTexture = texWood;
 		break;
 	case 4:
-		handTexture = texGrass;
+		handTexture = texGrassSide;
 		break;
 	case 5:
 		handTexture = texSand;
@@ -490,7 +490,16 @@ void Game::DrawHand()
 		break;
 	}
 	blockModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = handTexture;
-	DrawModel(blockModel, handPos, 0.4f, WHITE);
+
+	// TODO:  FIX FOR SPECIFICALLY THE GRASS
+	// since the texture looks upside down, we just rotate the block 180 degrees (PI) around the Z-axis.
+	// this flips it visually without messing with UV math.
+
+	Vector3 scale = { 0.4f, 0.4f, 0.4f };
+	Vector3 rotationAxis = { 0.0f, 0.0f, 1.0f }; // rotate around Z axis (Roll)
+	float rotationAngle = 180.0f;                // flip 180 degrees
+
+	DrawModelEx(blockModel, handPos, rotationAxis, rotationAngle, scale, WHITE);
 }
 
 void Game::DrawUI()
@@ -501,23 +510,8 @@ void Game::DrawUI()
 	DrawLine(cx, cy - 10, cx, cy + 10, BLACK);
 	DrawPixel(cx, cy, RED);
 
-	DrawFPS(600, 600);
+	DrawFPS(10, 10);
 
-	DrawText("Selected Block:", 10, 10, 20, BLACK);
-	if (currentBlockId == 1)
-		DrawText("DIRT", 10, 40, 20, BROWN);
-	if (currentBlockId == 2)
-		DrawText("STONE", 10, 40, 20, DARKGRAY);
-	if (currentBlockId == 3)
-		DrawText("WOOD", 10, 40, 20, ORANGE);
-	if (currentBlockId == 4)
-		DrawText("GRASS", 10, 40, 20, DARKGREEN);
-	if (currentBlockId == 5)
-		DrawText("SAND", 10, 40, 20, YELLOW);
-	if (currentBlockId == 6)
-		DrawText("BEDROCK", 10, 40, 20, DARKGRAY);
-	if (currentBlockId == 7)
-		DrawText("LEAVES", 10, 40, 20, GREEN);
 
 	// --- NOTIFICATION MESSAGE ---
 	if (messageTimer > 0.0f)
@@ -536,7 +530,7 @@ void Game::DrawUI()
 	}
 
 	// --- HOTBAR ---
-	int blockSize = 40;
+	int blockSize = 50;
 	int padding = 10;
 	int numSlots = 7;
 
@@ -554,36 +548,26 @@ void Game::DrawUI()
 		if (currentBlockId == i)
 			color = YELLOW; // highlight selected
 
-		DrawRectangle(x - 2, startY - 2, blockSize + 4, blockSize + 4, BLACK); // Border
+		DrawRectangle(x - 2, startY - 2, blockSize + 4, blockSize + 4, BLACK); // border
 		DrawRectangle(x, startY, blockSize, blockSize, color);
 
-		// draw Block Preview (Just a colored square for now)
-		Color previewColor = WHITE;
-		switch (i)
-		{
-		case 1:
-			previewColor = BROWN;
-			break; // Dirt
-		case 2:
-			previewColor = GRAY;
-			break; // Stone
-		case 3:
-			previewColor = DARKBROWN;
-			break; // Wood
-		case 4:
-			previewColor = GREEN;
-			break; // Grass
-		case 5:
-			previewColor = GOLD;
-			break; // Sand
-		case 6:
-			previewColor = DARKGRAY;
-			break; // Bedrock
-		case 7:
-			previewColor = DARKGREEN;
-			break; // Leaves
+		Texture2D previewTex;
+		switch (i) {
+		case 1: previewTex = texDirt; break;
+		case 2: previewTex = texStone; break;
+		case 3: previewTex = texWood; break;
+		case 4: previewTex = texGrassSide; break;
+		case 5: previewTex = texSand; break;
+		case 6: previewTex = texBedrock; break;
+		case 7: previewTex = texLeaves; break;
+		default: previewTex = texDirt; break;
 		}
-		DrawRectangle(x + 5, startY + 5, blockSize - 10, blockSize - 10, previewColor);
+
+		// define source (whole texture) and destination (inside the slot)
+		Rectangle sourceRec = { 0.0f, 0.0f, (float)previewTex.width, (float)previewTex.height };
+		Rectangle destRec = { (float)x + 4, (float)startY + 4, (float)blockSize - 8, (float)blockSize - 8 };
+
+		DrawTexturePro(previewTex, sourceRec, destRec, Vector2{ 0,0 }, 0.0f, WHITE);
 
 		// draw Number Key
 		DrawText(TextFormat("%d", i), x + 2, startY + 2, 10, BLACK);
