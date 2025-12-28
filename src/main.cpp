@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include "game.h"
+#include "world_gen.h"
 #include <ctime>
 
 int main()
@@ -7,7 +8,7 @@ int main()
     InitWindow(1280, 720, "VOXEL SANDBOX");
     SetTargetFPS(500);
 
-    SetRandomSeed((unsigned int)time(0));
+    WorldGen::worldSeed = GetRandomValue(0, 1000000);
     Game game;
 
     game.Init();
