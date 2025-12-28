@@ -642,6 +642,16 @@ Texture2D Game::GenSandTexture(int size)
 				sand.b -= 15;
 			}
 
+			// if we are at the edge of the block, darken the color
+			if (x == 0 || x == size - 1 || y == 0 || y == size - 1)
+			{
+				float edgeNoise = 0.92f + GetRandomValue(0, 4) * 0.01f;
+				sand.r *= edgeNoise;
+				sand.g *= edgeNoise;
+				sand.b *= edgeNoise;
+			}
+
+
 			pixels[y * size + x] = sand;
 		}
 	}
