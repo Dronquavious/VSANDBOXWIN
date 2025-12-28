@@ -9,6 +9,15 @@
 #define CHUNK_SIZE 32
 #define BLOCK_TEX_SIZE 16
 
+struct InventoryItem {
+    int blockID; // 0 = Empty
+    int count;   // for survival mode later
+};
+
+struct Inventory {
+    InventoryItem slots[36]; // 9 Hotbar slots (0-8), 27 Storage (9-35)
+    int selectedSlot;        // 0-8 (Which hotbar slot is active)
+};
 
 class Game
 {
@@ -60,7 +69,10 @@ private:
     Texture2D GenCactusTexture(int size);
 
     // Game State
-    int currentBlockId;
+    Inventory inventory;
+    int GetHeldBlockID() {
+        return inventory.slots[inventory.selectedSlot].blockID;
+    }
     bool isBlockSelected;
     Vector3 selectedBlockPos;
     Vector3 selectedNormal;
