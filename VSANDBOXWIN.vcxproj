@@ -22,10 +22,12 @@
     <ClCompile Include="src\chunk_manager.cpp" />
     <ClCompile Include="src\game.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\world_gen.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\chunk_manager.h" />
     <ClInclude Include="include\game.h" />
+    <ClInclude Include="include\world_gen.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

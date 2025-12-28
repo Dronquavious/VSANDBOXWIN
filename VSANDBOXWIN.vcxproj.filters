@@ -24,12 +24,18 @@
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\world_gen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\chunk_manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\game.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\world_gen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
