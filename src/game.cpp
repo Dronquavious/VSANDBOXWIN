@@ -3,6 +3,8 @@
 #include <cmath>
 #include <ctime>
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
@@ -10,12 +12,23 @@ void Game::Init()
 {
 	// variables init
 	handBobbing = 0.0f;
-	currentBlockId = 1;
 	playerPosition = Vector3{ 16.0f, 20.0f, 16.0f };
 	cameraAngleX = 0.0f;
 	cameraAngleY = 0.0f;
 	isFlying = true;
 	verticalVelocity = 0.0f;
+
+	// INVENTORY
+	inventory.selectedSlot = 0;
+	inventory.slots[0] = { 1, 64 };  // Dirt
+	inventory.slots[1] = { 2, 64 };  // Stone
+	inventory.slots[2] = { 3, 64 };  // Wood
+	inventory.slots[3] = { 4, 64 };  // Grass
+	inventory.slots[4] = { 5, 64 };  // Sand
+	inventory.slots[5] = { 9, 64 };  // Snow
+	inventory.slots[6] = { 10, 64 }; // Cactus
+	inventory.slots[7] = { 7, 64 };  // Leaves
+	inventory.slots[8] = { 6, 64 };  // Bedrock
 
 	// physics Settings
 	showDebugUI = true;
@@ -417,33 +430,51 @@ void Game::UpdateRaycast()
 
 void Game::EditMap()
 {
-	if (IsKeyPressed(KEY_ONE)) currentBlockId = 1;
-	if (IsKeyPressed(KEY_TWO)) currentBlockId = 2;
-	if (IsKeyPressed(KEY_THREE)) currentBlockId = 3;
-	if (IsKeyPressed(KEY_FOUR)) currentBlockId = 4;
-	if (IsKeyPressed(KEY_FIVE)) currentBlockId = 5;
-	if (IsKeyPressed(KEY_SIX)) currentBlockId = 6;
-	if (IsKeyPressed(KEY_SEVEN)) currentBlockId = 7;
+	// select Hotbar Slots with 1-9
+	if (IsKeyPressed(KEY_ONE))   inventory.selectedSlot = 0;
+	if (IsKeyPressed(KEY_TWO))   inventory.selectedSlot = 1;
+	if (IsKeyPressed(KEY_THREE)) inventory.selectedSlot = 2;
+	if (IsKeyPressed(KEY_FOUR))  inventory.selectedSlot = 3;
+	if (IsKeyPressed(KEY_FIVE))  inventory.selectedSlot = 4;
+	if (IsKeyPressed(KEY_SIX))   inventory.selectedSlot = 5;
+	if (IsKeyPressed(KEY_SEVEN)) inventory.selectedSlot = 6;
+	if (IsKeyPressed(KEY_EIGHT)) inventory.selectedSlot = 7;
+	if (IsKeyPressed(KEY_NINE))  inventory.selectedSlot = 8;
+
+	// mouse Wheel to scroll hotbar
+	float wheel = GetMouseWheelMove();
+	if (wheel > 0) inventory.selectedSlot--;
+	if (wheel < 0) inventory.selectedSlot++;
+
+	// wrap around
+	if (inventory.selectedSlot < 0) inventory.selectedSlot = 8;
+	if (inventory.selectedSlot > 8) inventory.selectedSlot = 0;
+
+	int currentID = GetHeldBlockID(); // Use helper
 
 	if (isBlockSelected)
 	{
 		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 		{
 			world.SetBlock((int)selectedBlockPos.x, (int)selectedBlockPos.y, (int)selectedBlockPos.z, 0);
-			UpdateRaycast(); // refresh selection instantly
+			UpdateRaycast();
 		}
 
 		if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
 		{
-			int newX = (int)(selectedBlockPos.x + round(selectedNormal.x));
-			int newY = (int)(selectedBlockPos.y + round(selectedNormal.y));
-			int newZ = (int)(selectedBlockPos.z + round(selectedNormal.z));
-
-			Vector3 blockCenter = { (float)newX + 0.5f, (float)newY + 0.5f, (float)newZ + 0.5f };
-			if (Vector3Distance(camera.position, blockCenter) > 1.2f)
+			// Only place if we are holding a valid block
+			if (currentID != 0)
 			{
-				world.SetBlock(newX, newY, newZ, currentBlockId);
-				UpdateRaycast();
+				int newX = (int)(selectedBlockPos.x + round(selectedNormal.x));
+				int newY = (int)(selectedBlockPos.y + round(selectedNormal.y));
+				int newZ = (int)(selectedBlockPos.z + round(selectedNormal.z));
+
+				Vector3 blockCenter = { (float)newX + 0.5f, (float)newY + 0.5f, (float)newZ + 0.5f };
+				if (Vector3Distance(camera.position, blockCenter) > 1.2f)
+				{
+					world.SetBlock(newX, newY, newZ, currentID);
+					UpdateRaycast();
+				}
 			}
 		}
 	}
@@ -467,33 +498,21 @@ void Game::DrawHand()
 	handPos.y -= 0.4f;
 	handPos.y += bobOffset;
 
+	int currentID = GetHeldBlockID();
+
 	Texture2D handTexture;
-	switch (currentBlockId)
+	switch (currentID)
 	{
-	case 1:
-		handTexture = texDirt;
-		break;
-	case 2:
-		handTexture = texStone;
-		break;
-	case 3:
-		handTexture = texWood;
-		break;
-	case 4:
-		handTexture = texGrassSide;
-		break;
-	case 5:
-		handTexture = texSand;
-		break;
-	case 6:
-		handTexture = texBedrock;
-		break;
-	case 7:
-		handTexture = texLeaves;
-		break;
-	default:
-		handTexture = texDirt;
-		break;
+		case 1: handTexture = texDirt; break;
+		case 2: handTexture = texStone; break;
+		case 3: handTexture = texWood; break;
+		case 4: handTexture = texGrassSide; break;
+		case 5: handTexture = texSand; break;
+		case 6: handTexture = texBedrock; break;
+		case 7: handTexture = texLeaves; break;
+		case 9: handTexture = texSnow; break;
+		case 10: handTexture = texCactus; break;
+		default: handTexture = texDirt; break;
 	}
 	blockModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = handTexture;
 
@@ -538,45 +557,50 @@ void Game::DrawUI()
 	// --- HOTBAR ---
 	int blockSize = 50;
 	int padding = 10;
-	int numSlots = 7;
+	int numSlots = 9; // first 9 slots 
 
 	// Calculate total width to center it
 	int totalWidth = (blockSize * numSlots) + (padding * (numSlots - 1));
 	int startX = (GetScreenWidth() - totalWidth) / 2;
 	int startY = GetScreenHeight() - blockSize - 20;
 
-	for (int i = 1; i <= numSlots; i++)
+	for (int i = 0; i < numSlots; i++)
 	{
-		int x = startX + ((i - 1) * (blockSize + padding));
+		int x = startX + (i * (blockSize + padding));
 
-		// draw Slot Background
-		Color color = LIGHTGRAY;
-		if (currentBlockId == i)
-			color = YELLOW; // highlight selected
+		// Draw Slot Background
+		Color color = Fade(LIGHTGRAY, 0.5f);
+		if (inventory.selectedSlot == i) color = YELLOW; // Highlight selected
 
-		DrawRectangle(x - 2, startY - 2, blockSize + 4, blockSize + 4, BLACK); // border
+		DrawRectangle(x - 2, startY - 2, blockSize + 4, blockSize + 4, BLACK);
 		DrawRectangle(x, startY, blockSize, blockSize, color);
 
-		Texture2D previewTex;
-		switch (i) {
-		case 1: previewTex = texDirt; break;
-		case 2: previewTex = texStone; break;
-		case 3: previewTex = texWood; break;
-		case 4: previewTex = texGrassSide; break;
-		case 5: previewTex = texSand; break;
-		case 6: previewTex = texBedrock; break;
-		case 7: previewTex = texLeaves; break;
-		default: previewTex = texDirt; break;
+		int blockID = inventory.slots[i].blockID;
+
+		// only draw texture if slot is not empty
+		if (blockID != 0)
+		{
+			Texture2D previewTex;
+			switch (blockID) {
+			case 1: previewTex = texDirt; break;
+			case 2: previewTex = texStone; break;
+			case 3: previewTex = texWood; break;
+			case 4: previewTex = texGrassSide; break;
+			case 5: previewTex = texSand; break;
+			case 6: previewTex = texBedrock; break;
+			case 7: previewTex = texLeaves; break;
+			case 9: previewTex = texSnow; break;
+			case 10: previewTex = texCactus; break;
+			default: previewTex = texDirt; break;
+			}
+
+			Rectangle sourceRec = { 0.0f, 0.0f, (float)previewTex.width, (float)previewTex.height };
+			Rectangle destRec = { (float)x + 4, (float)startY + 4, (float)blockSize - 8, (float)blockSize - 8 };
+			DrawTexturePro(previewTex, sourceRec, destRec, Vector2{ 0,0 }, 0.0f, WHITE);
 		}
 
-		// define source (whole texture) and destination (inside the slot)
-		Rectangle sourceRec = { 0.0f, 0.0f, (float)previewTex.width, (float)previewTex.height };
-		Rectangle destRec = { (float)x + 4, (float)startY + 4, (float)blockSize - 8, (float)blockSize - 8 };
-
-		DrawTexturePro(previewTex, sourceRec, destRec, Vector2{ 0,0 }, 0.0f, WHITE);
-
-		// draw Number Key
-		DrawText(TextFormat("%d", i), x + 2, startY + 2, 10, BLACK);
+		// draw Slot Number (1-9)
+		DrawText(TextFormat("%d", i + 1), x + 2, startY + 2, 10, BLACK);
 	}
 }
 
@@ -608,7 +632,6 @@ Texture2D Game::GenWoodTexture(int size)
 	return tex;
 }
 
-// new sand texture
 Texture2D Game::GenSandTexture(int size)
 {
 	Image img = GenImageColor(size, size, BLANK);
@@ -617,43 +640,44 @@ Texture2D Game::GenSandTexture(int size)
 	for (int y = 0; y < size; y++)
 	{
 		for (int x = 0; x < size; x++)
-		{
-			Color sand = { 237, 229, 173, 255 };
-
-			int nx = x / 2;
-			int ny = y / 2;
-			unsigned int seed = nx * 49632 ^ ny * 325176;
-			seed = (seed << 13) ^ seed;
-
-			float noise = 1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589)
-				& 0x7fffffff) / 1073741824.0f;
-
-			noise = roundf(noise * 4.0f) / 4.0f;
-
-			int variation = (int)(noise * 8.0f);
-			sand.r = Clamp(sand.r + variation, 0, 255);
-			sand.g = Clamp(sand.g + variation, 0, 255);
-			sand.b = Clamp(sand.b + variation, 0, 255);
-
-			if (GetRandomValue(0, 100) < 6)
+			for (int x = 0; x < size; x++)
 			{
-				sand.r -= 10;
-				sand.g -= 10;
-				sand.b -= 15;
+				Color sand = { 237, 229, 173, 255 };
+
+				int nx = x / 2;
+				int ny = y / 2;
+				unsigned int seed = nx * 49632 ^ ny * 325176;
+				seed = (seed << 13) ^ seed;
+
+				float noise = 1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589)
+					& 0x7fffffff) / 1073741824.0f;
+
+				noise = roundf(noise * 4.0f) / 4.0f;
+
+				int variation = (int)(noise * 8.0f);
+				sand.r = Clamp(sand.r + variation, 0, 255);
+				sand.g = Clamp(sand.g + variation, 0, 255);
+				sand.b = Clamp(sand.b + variation, 0, 255);
+
+				if (GetRandomValue(0, 100) < 6)
+				{
+					sand.r -= 10;
+					sand.g -= 10;
+					sand.b -= 15;
+				}
+
+				// if we are at the edge of the block, darken the color
+				if (x == 0 || x == size - 1 || y == 0 || y == size - 1)
+				{
+					float edgeNoise = 0.92f + GetRandomValue(0, 4) * 0.01f;
+					sand.r *= edgeNoise;
+					sand.g *= edgeNoise;
+					sand.b *= edgeNoise;
+				}
+
+
+				pixels[y * size + x] = sand;
 			}
-
-			// if we are at the edge of the block, darken the color
-			if (x == 0 || x == size - 1 || y == 0 || y == size - 1)
-			{
-				float edgeNoise = 0.92f + GetRandomValue(0, 4) * 0.01f;
-				sand.r *= edgeNoise;
-				sand.g *= edgeNoise;
-				sand.b *= edgeNoise;
-			}
-
-
-			pixels[y * size + x] = sand;
-		}
 	}
 
 	Image newImg;
@@ -685,20 +709,68 @@ Texture2D Game::GenLeavesTexture(int size)
 	return tex;
 }
 
-//TODO MAKE BETTER TEXTURE FOR THIS
 Texture2D Game::GenBedrockTexture(int size)
 {
-	Image img = GenImageCellular(size, size, 8);
-	ImageColorBrightness(&img, -80);
-	ImageColorContrast(&img, +20);
-	ImageColorTint(&img, Color{ 90, 90, 90, 255 });
+	Image img = GenImageColor(size, size, BLANK);
+	Color* pixels = LoadImageColors(img);
 
-	Texture2D tex = LoadTextureFromImage(img);
-	UnloadImage(img);
+	for (int y = 0; y < size; y++)
+	{
+		for (int x = 0; x < size; x++)
+		{
+			// base dark stone
+			Color rock = { 55, 55, 55, 255 };
+
+			// large chaotic noise
+			int nx = x / 3;
+			int ny = y / 3;
+			unsigned int seed = nx * 92837111 ^ ny * 689287499;
+			seed = (seed << 13) ^ seed;
+
+			float noise1 = 1.0f - ((seed * (seed * seed * 15731 + 789221)
+				+ 1376312589) & 0x7fffffff) / 1073741824.0f;
+
+			// smaller sharp noise
+			unsigned int seed2 = x * 73428767 ^ y * 912931;
+			seed2 = (seed2 << 13) ^ seed2;
+
+			float noise2 = 1.0f - ((seed2 * (seed2 * seed2 * 12497 + 604727)
+				+ 1345679039) & 0x7fffffff) / 1073741824.0f;
+
+			// combine & quantize
+			float combined = (noise1 * 0.7f + noise2 * 0.3f);
+			combined = roundf(combined * 5.0f) / 5.0f;
+
+			int variation = (int)(combined * 35.0f);
+
+			rock.r = Clamp(rock.r + variation, 20, 110);
+			rock.g = Clamp(rock.g + variation, 20, 110);
+			rock.b = Clamp(rock.b + variation, 20, 110);
+
+			// cracks (very dark pixels)
+			if (noise2 < -0.65f)
+			{
+				rock = { 15, 15, 15, 255 };
+			}
+
+			pixels[y * size + x] = rock;
+		}
+	}
+
+	Image newImg;
+	newImg.data = pixels;
+	newImg.width = size;
+	newImg.height = size;
+	newImg.mipmaps = 1;
+	newImg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+	Texture2D tex = LoadTextureFromImage(newImg);
+	UnloadImageColors(pixels);
 
 	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
 	return tex;
 }
+
 
 Texture2D Game::GenDirtTexture(int size)
 {
@@ -756,15 +828,73 @@ Texture2D Game::GenGrassSideTexture(int size)
 
 Texture2D Game::GenSnowTexture(int size)
 {
-	Image img = GenImagePerlinNoise(size, size, 50, 50, 4.0f);
-	ImageColorBrightness(&img, 50); // very bright
-	ImageColorContrast(&img, -50);  // low contrast (smooth)
-	ImageColorTint(&img, Color{ 240, 240, 255, 255 }); // White/Blue tint
-	Texture2D tex = LoadTextureFromImage(img);
-	UnloadImage(img);
+	Image img = GenImageColor(size, size, BLANK);
+	Color* pixels = LoadImageColors(img);
+
+	for (int y = 0; y < size; y++)
+	{
+		for (int x = 0; x < size; x++)
+		{
+			// base snow color (NOT pure white)
+			Color snow = { 240, 242, 245, 255 };
+
+			// blocky noise (very subtle)
+			int nx = x / 2;
+			int ny = y / 2;
+			unsigned int seed = nx * 73856093 ^ ny * 19349663;
+			seed = (seed << 13) ^ seed;
+
+			float noise = 1.0f - ((seed * (seed * seed * 15731 + 789221)
+				+ 1376312589) & 0x7fffffff) / 1073741824.0f;
+
+			noise = roundf(noise * 3.0f) / 3.0f;
+
+			int variation = (int)(noise * 4.0f);
+			snow.r = Clamp(snow.r + variation, 0, 255);
+			snow.g = Clamp(snow.g + variation, 0, 255);
+			snow.b = Clamp(snow.b + variation, 0, 255);
+
+			// yiny sparkles / ice flecks
+			if (GetRandomValue(0, 100) < 4)
+			{
+				snow.r += 5;
+				snow.g += 5;
+				snow.b += 8;
+			}
+
+			// VERY soft edge (much weaker than sand)
+			int edgeDist = MIN(
+				MIN(x, size - 1 - x),
+				MIN(y, size - 1 - y)
+			);
+
+			if (edgeDist == 0)
+			{
+				float edge = 0.97f;
+				snow.r *= edge;
+				snow.g *= edge;
+				snow.b *= edge;
+			}
+
+			pixels[y * size + x] = snow;
+		}
+	}
+
+	Image newImg;
+	newImg.data = pixels;
+	newImg.width = size;
+	newImg.height = size;
+	newImg.mipmaps = 1;
+	newImg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+	Texture2D tex = LoadTextureFromImage(newImg);
+
+	UnloadImageColors(pixels);
+
 	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
 	return tex;
 }
+
 
 Texture2D Game::GenCactusTexture(int size)
 {
