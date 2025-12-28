@@ -27,6 +27,9 @@ As the complexity of the engine grew (infinite chunks, procedural generation, vo
 1.  **Prerequisites:**
     * Visual Studio 2022 (or newer) (with "Desktop development with C++" workload).
     * **Raylib:** You must have the Raylib library installed or linked via NuGet.
+    * **RayGUI:** This project requires `raygui.h` for the UI.
+        * Download `raygui.h` from [raygui GitHub](https://github.com/raysan5/raygui).
+        * Place it in your `include/` folder.
 2.  **Installation:**
     * Clone this repository: `git clone https://github.com/Dronquavious/VSANDBOXWIN.git`
     * Open `VSANDBOXWIN.slnx`.
@@ -35,14 +38,16 @@ As the complexity of the engine grew (infinite chunks, procedural generation, vo
     * Press **F5** (Local Windows Debugger).
 
 ## 🎮 Controls
-* **WASD:** Move
-* **Space:** Jump / Fly Up
-* **Left Ctrl:** Fly Down
-* **F:** Toggle Fly Mode
-* **Tab:** Open Debug/Settings Menu
-* **Left Click:** Break Block
-* **Right Click:** Place Block
-* **1-7:** Select Block Type
+| Key | Action |
+| :--- | :--- |
+| **W, A, S, D** | Move Player |
+| **Space** | Jump / Fly Up |
+| **Left Ctrl** | Fly Down |
+| **F** | Toggle Fly Mode |
+| **Left Click** | Break Block |
+| **Right Click** | Place Block |
+| **1 - 7** | Select Block Type |
+| **TAB** | Open Debug/Settings Menu |
 
 ## 📄 License
 This project is open source and under the MIT License. Feel free to use it for learning or as a base for your own voxel engine!
