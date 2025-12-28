@@ -21,7 +21,7 @@ private:
     static void PlaceTree(Chunk& chunk, int x, int y, int z, BiomeType biome);
     static void PlaceCactus(Chunk& chunk, int x, int y, int z);
 
-    // nise Helpers
+    // noise Helpers
     static float SimpleNoise3D(float x, float y, float z);
     static float GetHeightNoise(int x, int z);
 };
