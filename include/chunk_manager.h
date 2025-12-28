@@ -12,7 +12,7 @@ struct Chunk {
 
 	// store the "Baked" 3D models here
 	// layers[1] = Dirt Model, layers[2] = Stone Model, etc.
-	Model layers[9];
+	Model layers[12];
 	bool meshReady; // is mesh built and ready to draw?
 
 	Chunk() {
@@ -24,7 +24,7 @@ struct Chunk {
 					blocks[x][y][z] = 0;
 
 		// initialize Empty Models
-		for (int i = 0; i < 9; i++) layers[i] = { 0 };
+		for (int i = 0; i < 12; i++) layers[i] = { 0 };
 	}
 };
 
