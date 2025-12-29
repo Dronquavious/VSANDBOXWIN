@@ -15,7 +15,7 @@ void ChunkManager::UnloadAll() {
 }
 
 void ChunkManager::UnloadChunkModels(Chunk& chunk) {
-    for (int i = 0; i < 11; i++) {
+    for (int i = 0; i < 12; i++) {
         if (chunk.layers[i].meshCount > 0) {
             UnloadModel(chunk.layers[i]);
             chunk.layers[i] = { 0 };
