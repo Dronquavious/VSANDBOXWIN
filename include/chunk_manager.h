@@ -10,6 +10,10 @@
 struct Chunk {
 	int blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 
+	// storing light levels
+	// 15 full sun, 0 pitch black
+	unsigned char light[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+
 	// store the "Baked" 3D models here
 	// layers[1] = Dirt Model, layers[2] = Stone Model, etc.
 	Model layers[12];
@@ -17,11 +21,14 @@ struct Chunk {
 
 	Chunk() {
 		meshReady = false;
-		// initialize to air
-		for (int x = 0; x < CHUNK_SIZE; x++)
-			for (int y = 0; y < CHUNK_SIZE; y++)
-				for (int z = 0; z < CHUNK_SIZE; z++)
+		for (int x = 0; x < CHUNK_SIZE; x++) {
+			for (int y = 0; y < CHUNK_SIZE; y++) {
+				for (int z = 0; z < CHUNK_SIZE; z++) {
 					blocks[x][y][z] = 0;
+					light[x][y][z] = 15; // default to full light (Air)
+				}
+			}
+		}
 
 		// initialize Empty Models
 		for (int i = 0; i < 12; i++) layers[i] = { 0 };
@@ -61,6 +68,9 @@ private:
 	// function that does the heavy math ONCE
 	void BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textures);
 	void UnloadChunkModels(Chunk& chunk);
+
+	// sunlight
+	void ComputeChunkLighting(Chunk& chunk);
 };
 
 #endif
