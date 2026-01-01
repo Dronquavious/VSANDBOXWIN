@@ -69,6 +69,11 @@ private:
     Texture2D GenCactusTexture(int size);
     Texture2D GenSnowSideTexture(int size);
 
+    // shader stuff
+    Shader fogShader;
+    int fogDensityLoc; // location of density var in shader
+    int fogColorLoc; // location of color var in shader
+
     // Game State
     Inventory inventory;
     int GetHeldBlockID() {

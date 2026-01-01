@@ -8,6 +8,65 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
+// SHADER CODE (GLSL 330)
+const char* fogVsCode = R"(
+#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec4 vertexColor;
+in vec3 vertexNormal;
+
+uniform mat4 mvp;
+uniform mat4 matModel;
+uniform mat4 matView;
+
+out vec2 fragTexCoord;
+out vec4 fragColor;
+out float fragDist;
+
+void main()
+{
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+    
+    // Calculate distance from camera to vertex
+    vec4 viewPos = matView * matModel * vec4(vertexPosition, 1.0);
+    fragDist = length(viewPos.xyz);
+    
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)";
+
+const char* fogFsCode = R"(
+#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+in float fragDist;
+
+out vec4 finalColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+// Fog Uniforms
+uniform float fogDensity;
+uniform vec3 fogColor;
+
+void main()
+{
+    vec4 texColor = texture(texture0, fragTexCoord);
+    vec4 baseColor = texColor * colDiffuse * fragColor;
+    
+    // Exponential Fog Calculation
+    // 1.0 / exp(dist * density)^2
+    float fogFactor = 1.0 / exp(pow(fragDist * fogDensity, 2.0));
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+    
+    // Mix the Block color with the Fog/Sky color
+    finalColor = mix(vec4(fogColor, 1.0), baseColor, fogFactor);
+}
+)";
+
 void Game::Init()
 {
 	// variables init
@@ -69,6 +128,18 @@ void Game::Init()
 	showDebugUI = false;
 	messageTimer = 0.0f;
 	messageText = "";
+
+	// loading fog shader
+	fogShader = LoadShaderFromMemory(fogVsCode, fogFsCode);
+
+	// get locations of the variables inside the shader
+	fogDensityLoc = GetShaderLocation(fogShader, "fogDensity");
+	fogColorLoc = GetShaderLocation(fogShader, "fogColor");
+
+	// default density (How thick the fog is)
+	// 0.015 is a good start. Lower = Clearer, Higher = Thicker
+	float density = 1.0f;
+	SetShaderValue(fogShader, fogDensityLoc, &density, SHADER_UNIFORM_FLOAT);
 
 	world.Init();
 }
@@ -208,8 +279,16 @@ void Game::draw()
 	textures[10] = texCactus;
 	textures[11] = texSnowSide;
 
+	float fogColor[3] = {
+		(float)skyColor.r / 255.0f,
+		(float)skyColor.g / 255.0f,
+		(float)skyColor.b / 255.0f
+	};
+	SetShaderValue(fogShader, fogColorLoc, fogColor, SHADER_UNIFORM_VEC3);
+
+
 	// draw the infinite chunks
-	world.UpdateAndDraw(playerPosition, textures);
+	world.UpdateAndDraw(playerPosition, textures, fogShader);
 
 	// --- DRAW BLOCK HIGHLIGHT ---
 	if (isBlockSelected)
@@ -246,6 +325,7 @@ void Game::shutDown()
 	UnloadTexture(texSnow);
 	UnloadTexture(texCactus);
 	UnloadTexture(texSnowSide);
+	UnloadShader(fogShader);
 	world.UnloadAll();
 }
 
