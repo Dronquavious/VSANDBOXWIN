@@ -167,10 +167,10 @@ void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textu
 }
 
 // --- UPDATE AND DRAW ---
-void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures) {
+void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader) {
     int playerCX = (int)floor(playerPos.x / CHUNK_SIZE);
     int playerCZ = (int)floor(playerPos.z / CHUNK_SIZE);
-    int renderDist = 8;
+    int renderDist = 12;
 
     for (int cx = playerCX - renderDist; cx <= playerCX + renderDist; cx++) {
         for (int cz = playerCZ - renderDist; cz <= playerCZ + renderDist; cz++) {
