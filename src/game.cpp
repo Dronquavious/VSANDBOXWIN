@@ -57,9 +57,13 @@ void main()
     vec4 texColor = texture(texture0, fragTexCoord);
     vec4 baseColor = texColor * colDiffuse * fragColor;
     
+    // create a "Clear Zone" of 70 units around the player
+    // If distance is less than 70, fog is 0.
+    float dist = max(fragDist - 70.0, 0.0);
+    
     // Exponential Fog Calculation
-    // 1.0 / exp(dist * density)^2
-    float fogFactor = 1.0 / exp(pow(fragDist * fogDensity, 2.0));
+    // We use the new 'dist' variable instead of 'fragDist'
+    float fogFactor = 1.0 / exp(pow(dist * fogDensity, 2.0));
     fogFactor = clamp(fogFactor, 0.0, 1.0);
     
     // Mix the Block color with the Fog/Sky color
@@ -138,7 +142,7 @@ void Game::Init()
 
 	// default density (How thick the fog is)
 	// 0.015 is a good start. Lower = Clearer, Higher = Thicker
-	float density = 1.0f;
+	float density = 0.005f;
 	SetShaderValue(fogShader, fogDensityLoc, &density, SHADER_UNIFORM_FLOAT);
 
 	world.Init();
