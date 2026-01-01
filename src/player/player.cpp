@@ -3,7 +3,7 @@
 #include "../blocks/block_types.h"
 
 void Player::Init() {
-    position = Vector3{ 16.0f, 20.0f, 16.0f };
+    position = Vector3{ 16.0f, 60.0f, 16.0f };
     cameraAngleX = 0.0f;
     cameraAngleY = 0.0f;
     isFlying = true;
