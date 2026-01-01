@@ -34,7 +34,8 @@ private:
     void UpdateRaycast();
     void EditMap();
 
-    void DrawWorld(Color tint);
+    // not implemented yet may do in the future
+    // void DrawWorld(Color tint);
     void DrawHand(Color tint);
     void DrawUI();
 
@@ -53,9 +54,18 @@ private:
     Model blockModel;
     Model skyModel;
 
+    // cloud anim
+    float cloudScroll;
+    Color LerpColor(Color a, Color b, float t);
+    
+    // Sky Systems
+    Model cloudModel; // The middle layer (White Noise)
+    Model hazeModel;  // The near layer (Atmosphere blending)
+
     // Resources (Assets)
     Texture2D texDirt, texStone, texWood, texGrass, texGrassSide;
     Texture2D texSand, texBedrock, texLeaves, texSnow, texSnowSide, texCactus;
+    Texture2D texClouds, texHaze;
 
     // Texture Generators
     Texture2D GenStoneTexture(int size);
@@ -70,6 +80,8 @@ private:
     Texture2D GenCactusTexture(int size);
     Texture2D GenSnowSideTexture(int size);
     Texture2D GenerateSkyTexture();
+    Texture2D GenerateCloudTexture();
+    Texture2D GenerateHazeTexture();
 
     // shader stuff
     Shader fogShader;
@@ -113,6 +125,8 @@ private:
     const char *messageText;
 
     bool IsBlockActive(int x, int y, int z); // Helper for culling
+
+
 };
 
 #endif

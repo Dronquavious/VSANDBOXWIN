@@ -155,6 +155,27 @@ void Game::Init()
 	skyModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = skyTex;
 	SetTextureWrap(skyTex, TEXTURE_WRAP_CLAMP);
 
+	// cloud layer
+	Mesh cloudMesh = GenMeshPlane(2000.0f, 2000.0f, 1, 1);
+
+	// scale UVs so the texture repeats many times across this giant plane
+	// creates the density of the clouds
+	for (int i = 0; i < cloudMesh.vertexCount; i++) {
+		cloudMesh.texcoords[i * 2] *= 8.0f;     // Repeat 8 times on X
+		cloudMesh.texcoords[i * 2 + 1] *= 8.0f; // Repeat 8 times on Y
+	}
+
+	cloudModel = LoadModelFromMesh(cloudMesh);
+	texClouds = GenerateCloudTexture();
+	cloudModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texClouds;
+	cloudScroll = 0.0f;
+
+	// haze layer
+	Mesh hazeMesh = GenMeshCylinder(390.0f, 200.0f, 16);
+	hazeModel = LoadModelFromMesh(hazeMesh);
+	texHaze = GenerateHazeTexture();
+	hazeModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texHaze;
+
 	world.Init();
 }
 
@@ -234,30 +255,18 @@ void Game::update()
 
 void Game::draw()
 {
-	BeginDrawing();
-
 	// brightness based on time
-	// 0.5 = Noon (Brightness 1.0)
-	// 0.0 or 1.0 = Midnight (Brightness 0.2)
 	float brightness = 1.0f;
-
-	if (timeOfDay > 0.5f) // afternoon -> night
-	{
-		// 0.5 to 1.0
-		float t = (timeOfDay - 0.5f) * 2.0f; // 0.0 to 1.0
+	if (timeOfDay > 0.5f) {
+		float t = (timeOfDay - 0.5f) * 2.0f;
 		brightness = 1.0f - t;
 	}
-	else // morning -> noon
-	{
-		// 0.0 to 0.5
-		float t = timeOfDay * 2.0f; // 0.0 to 1.0
+	else {
+		float t = timeOfDay * 2.0f;
 		brightness = t;
 	}
-
-	// clamp brightness so it never goes Pitch Black (Moonlight)
 	if (brightness < 0.1f) brightness = 0.1f;
 
-	// tint color
 	Color skyTint = {
 		(unsigned char)(255 * brightness),
 		(unsigned char)(255 * brightness),
@@ -265,56 +274,90 @@ void Game::draw()
 		255
 	};
 
+	// animate clouds
+	cloudScroll += GetFrameTime() * 0.005f;
+	if (cloudScroll > 1000.0f) cloudScroll = 0.0f;
+
+	BeginDrawing();
 	ClearBackground(BLACK);
 
 	BeginMode3D(camera);
 
-	// sky
 	rlDisableDepthMask();
 	rlDisableDepthTest();
+	rlDisableBackfaceCulling(); // allow inside of skybox to be visible
 
 	Vector3 skyScale = { -800.0f, 800.0f, 800.0f };
-	DrawModelEx(
-		skyModel,
-		camera.position,
-		{ 0.0f, 1.0f, 0.0f },
-		0.0f,
-		skyScale,
-		skyTint
-	);
+	DrawModelEx(skyModel, camera.position, Vector3{ 0.0f, 1.0f, 0.0f }, 0.0f, skyScale, skyTint);
 
-	rlEnableDepthTest();
-	rlEnableDepthMask();
-
-	// sun n moon
+	// sraw sun & moon (they should be visible regardless)
 	float orbitRadius = 400.0f;
 	float angle = (timeOfDay * 2.0f * PI) - (PI / 2.0f);
+	Vector3 sunPos = { camera.position.x + cosf(angle) * orbitRadius, camera.position.y + sinf(angle) * orbitRadius, camera.position.z };
+	Vector3 moonPos = { camera.position.x - cosf(angle) * orbitRadius, camera.position.y - sinf(angle) * orbitRadius, camera.position.z };
+	DrawSphere(sunPos, 40.0f, Color{ 255,255,200,255 });
+	DrawSphere(moonPos, 20.0f, Color{ 220,220,220,255 });
 
-	Vector3 sunPos = {
-		camera.position.x + cosf(angle) * orbitRadius,
-		camera.position.y + sinf(angle) * orbitRadius,
-		camera.position.z
+	// re-enable depth TEST before drawing any alpha layers so they are occluded by nearer geometry
+	rlEnableDepthTest();
+
+	// clouds (alpha blended dome/plane above the camera)
+	// keep depth TEST on, but disable DEPTH WRITE so clouds don't block world geometry
+	BeginBlendMode(BLEND_ALPHA);
+	rlDisableDepthMask();
+
+	// make clouds always centered on camera (prevents slicing and seams)
+	Vector3 camPos = camera.position;
+	Vector3 cloudPos = camPos;
+	cloudPos.y = camPos.y + 80.0f; // relative height above camera
+
+	// simulate movement by rotating the cloud mesh instead of texture-matrix
+	static float cloudAngle = 0.0f;
+	cloudAngle += GetFrameTime() * 2.0f; // degrees/sec
+	if (cloudAngle > 360.0f) cloudAngle -= 360.0f;
+
+	float sunHeight = sinf(angle); // -1 = night, +1 = noon
+	float dayFactor = Clamp((sunHeight + 0.2f) / 1.2f, 0.0f, 1.0f);
+	Color cloudDay = Color{ 240, 240, 240, 255 };
+	Color cloudNight = Color{ 80, 90, 110, 255 };
+
+	Color cloudTint = LerpColor(cloudNight, cloudDay, dayFactor);
+
+	DrawModelEx(cloudModel, cloudPos, Vector3{ 0, 1, 0 }, cloudAngle, Vector3{ 1, 1, 1 }, Fade(cloudTint, 0.9f));
+
+	rlEnableDepthMask();
+	EndBlendMode();
+
+	// haze
+	BeginBlendMode(BLEND_ALPHA);
+	rlDisableDepthMask();
+
+	Color skyDay = Color{ 135, 180, 235, 255 };
+	Color skyNight = Color{ 10, 15, 30, 255 };
+
+	Color skyColor = LerpColor(skyNight, skyDay, dayFactor);
+
+	Vector3 hazePos = camPos;
+	hazePos.y = camPos.y + 50.0f;
+	DrawModelEx( hazeModel, hazePos, Vector3 {0, 1, 0}, 0.0f, Vector3 {1, 1, 1}, Fade(skyColor, 0.9f));
+
+	rlEnableDepthMask();
+	EndBlendMode();
+
+	// restore culling for world
+	rlEnableBackfaceCulling();
+
+	// --- WORLD RENDER SECTION ---
+
+	// Update Fog Shader Variables
+	float fogColor[3] = {
+	skyColor.r / 255.0f,
+	skyColor.g / 255.0f,
+	skyColor.b / 255.0f
 	};
 
-	Vector3 moonPos = {
-		camera.position.x - cosf(angle) * orbitRadius,
-		camera.position.y - sinf(angle) * orbitRadius,
-		camera.position.z
-	};
+	SetShaderValue(fogShader, fogColorLoc, fogColor, SHADER_UNIFORM_VEC3);
 
-	// draw sun
-	DrawSphere(sunPos, 40.0f, Color{ 255, 255, 200, 255 });
-	DrawSphere(moonPos, 20.0f, Color{ 220, 220, 220, 255 });
-
-	// update fog shader
-	float horizonR = (200.0f / 255.0f) * brightness;
-	float horizonG = (220.0f / 255.0f) * brightness;
-	float horizonB = (255.0f / 255.0f) * brightness;
-
-	float currentFogColor[3] = { horizonR, horizonG, horizonB };
-	SetShaderValue(fogShader, fogColorLoc, currentFogColor, SHADER_UNIFORM_VEC3);
-
-	// draw world
 	Texture2D textures[12];
 	textures[1] = texDirt;
 	textures[2] = texStone;
@@ -330,7 +373,7 @@ void Game::draw()
 
 	world.UpdateAndDraw(playerPosition, textures, fogShader, skyTint);
 
-	// --- HIGHLIGHT ---
+	// Highlight Box
 	if (isBlockSelected)
 	{
 		Vector3 center = {
@@ -367,6 +410,10 @@ void Game::shutDown()
 	UnloadTexture(texCactus);
 	UnloadTexture(texSnowSide);
 	UnloadShader(fogShader);
+	UnloadTexture(texClouds);
+	UnloadTexture(texHaze);
+	UnloadModel(cloudModel);
+	UnloadModel(hazeModel);
 	world.UnloadAll();
 }
 
@@ -1131,6 +1178,119 @@ Texture2D Game::GenerateSkyTexture()
 	return tex;
 }
 
+Texture2D Game::GenerateCloudTexture()
+{
+	const int size = 512;
+	Image img = GenImageColor(size, size, BLANK);
+
+	// direct pixel access
+	Color* pixels = LoadImageColors(img);
+
+	// clear to transparent
+	for (int i = 0; i < size * size; i++) pixels[i] = BLANK;
+
+	// draw 2000 random soft cloud blobs
+	for (int i = 0; i < 2000; i++)
+	{
+		int x = GetRandomValue(0, size - 1);
+		int y = GetRandomValue(0, size - 1);
+		int radius = GetRandomValue(20, 60);
+		int baseOpacity = GetRandomValue(10, 30); // base opacity for softness
+
+		for (int py = -radius; py <= radius; py++)
+		{
+			for (int px = -radius; px <= radius; px++)
+			{
+				if (px * px + py * py > radius * radius) continue; // circle check
+
+				// distance from center for soft edges
+				float dist = sqrtf(float(px * px + py * py)) / radius;
+				int blobAlpha = int((1.0f - dist) * baseOpacity);
+				if (blobAlpha < 0) blobAlpha = 0;
+
+				// calculate wrapped coordinates
+				int finalX = (x + px + size) % size;
+				int finalY = (y + py + size) % size;
+
+				// add color with alpha blending
+				Color* target = &pixels[finalY * size + finalX];
+
+				int newAlpha = target->a + blobAlpha;
+				if (newAlpha > 255) newAlpha = 255;
+
+				// slight color variation for softness
+				int shade = 220 + GetRandomValue(0, 35); // 220-255
+				target->r = shade;
+				target->g = shade;
+				target->b = shade;
+				target->a = (unsigned char)newAlpha;
+			}
+		}
+	}
+
+	// create texture
+	UnloadImage(img);
+	Image cloudImg = { pixels, size, size, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+	Texture2D tex = LoadTextureFromImage(cloudImg);
+	UnloadImageColors(pixels);
+
+	SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
+	SetTextureWrap(tex, TEXTURE_WRAP_REPEAT); // repeat mode
+
+	return tex;
+}
+
+
+Texture2D Game::GenerateHazeTexture()
+{
+	const int width = 32;
+	const int height = 128;
+
+	Image img = GenImageColor(width, height, BLANK);
+	Color* pixels = LoadImageColors(img);
+
+	for (int y = 0; y < height; y++)
+	{
+		float t = (float)y / (float)(height - 1);
+
+		// stronger at horizon, fades upward
+		float alpha = powf(t, 4.0f) * 120.0f;
+
+		for (int x = 0; x < width; x++)
+		{
+			pixels[y * width + x] = {
+				255, 255, 255,
+				(unsigned char)alpha
+			};
+		}
+	}
+
+	Image finalImg = {
+		pixels,
+		width,
+		height,
+		1,
+		PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
+	};
+
+	Texture2D tex = LoadTextureFromImage(finalImg);
+	UnloadImageColors(pixels);
+
+	SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
+	SetTextureWrap(tex, TEXTURE_WRAP_CLAMP);
+
+	return tex;
+}
+
+Color Game::LerpColor(Color a, Color b, float t) {
+	t = Clamp(t, 0.0f, 1.0f);
+	return Color{
+		(unsigned char)(a.r + (b.r - a.r) * t),
+		(unsigned char)(a.g + (b.g - a.g) * t),
+		(unsigned char)(a.b + (b.b - a.b) * t),
+		(unsigned char)(a.a + (b.a - a.a) * t)
+	};
+}
 
 bool Game::IsBlockActive(int x, int y, int z)
 {
