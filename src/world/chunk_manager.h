@@ -9,7 +9,7 @@
 struct Chunk {
     int blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
     unsigned char light[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // 15 full sun, 0 pitch black
-    Model layers[12];
+    Model layers[13];
     bool meshReady; 
     
     // optimization flag, if false phys ignores this chunk
@@ -26,7 +26,7 @@ struct Chunk {
                 }
             }
         }
-        for (int i = 0; i < 12; i++) layers[i] = { 0 };
+        for (int i = 0; i < 13; i++) layers[i] = { 0 };
     }
 };
 

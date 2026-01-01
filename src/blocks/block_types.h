@@ -13,7 +13,8 @@ enum BlockType {
     BLOCK_GRASS_SIDE = 8, // internal use for rendering
     BLOCK_SNOW = 9,
     BLOCK_CACTUS = 10,
-    BLOCK_SNOW_SIDE = 11  // internal use for rendering
+    BLOCK_SNOW_SIDE = 11,  // internal use for rendering
+    BLOCK_SNOW_LEAVES = 12
 };
 
 enum BiomeType { 

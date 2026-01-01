@@ -32,7 +32,7 @@ private:
     // environment textures
     Texture2D texClouds;
     Texture2D texHaze;
-    Texture2D textures[12]; // block textures
+    Texture2D textures[13]; // block textures
 
     // animation state
     float cloudScroll;

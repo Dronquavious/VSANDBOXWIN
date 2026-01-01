@@ -17,7 +17,7 @@ void ChunkManager::UnloadAll() {
 }
 
 void ChunkManager::UnloadChunkModels(Chunk& chunk) {
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 13; i++) {
         if (chunk.layers[i].meshCount > 0) {
             UnloadModel(chunk.layers[i]);
             chunk.layers[i] = { 0 };
@@ -98,9 +98,9 @@ void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
 void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textures) {
     UnloadChunkModels(chunk);
 
-    std::vector<float> vertices[12];
-    std::vector<float> texcoords[12];
-    std::vector<unsigned char> colors[12];
+    std::vector<float> vertices[13];
+    std::vector<float> texcoords[13];
+    std::vector<unsigned char> colors[13];
 
     auto getLight = [&](int x, int y, int z) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) {
@@ -155,6 +155,11 @@ void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textu
                         if (isBottom) return (int)BLOCK_DIRT;
                         return (int)BLOCK_SNOW_SIDE;
                     }
+                    if (blockID == BLOCK_SNOW_LEAVES) {
+                        if (isTop) return (int)BLOCK_SNOW;    // reuse snow top
+                        if (isBottom) return (int)BLOCK_LEAVES; // reuse leaf bottom
+                        return (int)BLOCK_SNOW_LEAVES;        // side with drip
+                    }
                     return blockID;
                 };
 
@@ -181,7 +186,7 @@ void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textu
         }
     }
 
-    for (int i = 1; i <= 11; i++) {
+    for (int i = 1; i <= 12; i++) {
         if (vertices[i].empty()) continue;
         Mesh mesh = { 0 };
         mesh.vertexCount = (int)vertices[i].size() / 3;
@@ -213,7 +218,7 @@ void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader 
             if (!chunk.meshReady) {
                 BuildChunkMesh(chunk, cx, cz, textures);
             }
-            for (int i = 1; i <= 11; i++) {
+            for (int i = 1; i <= 12; i++) {
                 if (chunk.layers[i].meshCount > 0) {
                     chunk.layers[i].materials[0].shader = shader;
                     DrawModel(chunk.layers[i], { 0,0,0 }, 1.0f, tint);

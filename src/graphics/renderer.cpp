@@ -67,6 +67,7 @@ void Renderer::Init() {
     textures[BLOCK_SNOW] = BlockManager::GenSnowTexture(BLOCK_TEX_SIZE);
     textures[BLOCK_CACTUS] = BlockManager::GenCactusTexture(BLOCK_TEX_SIZE);
     textures[BLOCK_SNOW_SIDE] = BlockManager::GenSnowSideTexture(BLOCK_TEX_SIZE);
+    textures[BLOCK_SNOW_LEAVES] = BlockManager::GenSnowLeavesSideTexture(BLOCK_TEX_SIZE);
 
     Mesh mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
     blockModel = LoadModelFromMesh(mesh);
@@ -103,7 +104,7 @@ void Renderer::Init() {
 }
 
 void Renderer::Unload() {
-    for (int i = 1; i <= 11; i++) UnloadTexture(textures[i]);
+    for (int i = 1; i <= 12; i++) UnloadTexture(textures[i]);
     UnloadModel(blockModel);
     UnloadModel(skyModel);
     UnloadModel(cloudModel);
