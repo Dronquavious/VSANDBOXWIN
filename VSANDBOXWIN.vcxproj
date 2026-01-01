@@ -19,18 +19,27 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\chunk_manager.cpp" />
-    <ClCompile Include="src\game.cpp" />
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\world_gen.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="include\chunk_manager.h" />
-    <ClInclude Include="include\game.h" />
-    <ClInclude Include="include\world_gen.h" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\blocks\block_manager.cpp" />
+    <ClCompile Include="src\core\game.cpp" />
+    <ClCompile Include="src\graphics\renderer.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\player\player.cpp" />
+    <ClCompile Include="src\world\chunk_manager.cpp" />
+    <ClCompile Include="src\world\world_generator.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\blocks\block_manager.h" />
+    <ClInclude Include="src\blocks\block_types.h" />
+    <ClInclude Include="src\core\constants.h" />
+    <ClInclude Include="src\core\game.h" />
+    <ClInclude Include="src\graphics\renderer.h" />
+    <ClInclude Include="src\player\inventory.h" />
+    <ClInclude Include="src\player\player.h" />
+    <ClInclude Include="src\world\chunk_manager.h" />
+    <ClInclude Include="src\world\world_generator.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -119,7 +128,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\tambw\Desktop\Projects\VSANDBOXWIN\include;C:\Users\tambw\Desktop\Graphics libraries\raylib-5.5_win64_msvc16\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tambw\Desktop\Projects\VSANDBOXWIN\src;C:\Users\tambw\Desktop\Graphics libraries\raylib-5.5_win64_msvc16\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,7 +147,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\tambw\Desktop\Projects\VSANDBOXWIN\include;C:\Users\tambw\Desktop\Graphics libraries\raylib-5.5_win64_msvc16\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tambw\Desktop\Projects\VSANDBOXWIN\src;C:\Users\tambw\Desktop\Graphics libraries\raylib-5.5_win64_msvc16\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
