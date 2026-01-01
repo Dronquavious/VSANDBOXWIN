@@ -11,9 +11,13 @@ struct Chunk {
     unsigned char light[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // 15 full sun, 0 pitch black
     Model layers[12];
     bool meshReady; 
+    
+    // optimization flag, if false phys ignores this chunk
+    bool shouldStep;
 
     Chunk() {
         meshReady = false;
+        shouldStep = false; // default to asleep
         for (int x = 0; x < CHUNK_SIZE; x++) {
             for (int y = 0; y < CHUNK_SIZE; y++) {
                 for (int z = 0; z < CHUNK_SIZE; z++) {
@@ -41,6 +45,7 @@ public:
 
     // draw and update
     void UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader, Color tint);
+    void UpdateChunkPhysics();
 
     // block access
     int GetBlock(int x, int y, int z, bool createIfMissing = true);
@@ -53,7 +58,7 @@ private:
     void GenerateChunk(Chunk& chunk, int chunkX, int chunkZ);
     void BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textures);
     void UnloadChunkModels(Chunk& chunk);
-    void ComputeChunkLighting(Chunk& chunk);
+    void ComputeChunkLighting(Chunk& chunk);  
 };
 
 #endif

@@ -58,6 +58,8 @@ void ChunkManager::SetBlock(int x, int y, int z, int type) {
 
     chunks[coord].blocks[lx][y][lz] = type;
     chunks[coord].meshReady = false;
+
+    chunks[coord].shouldStep = true;
 }
 
 bool ChunkManager::IsBlockSolid(int x, int y, int z) {
@@ -67,6 +69,9 @@ bool ChunkManager::IsBlockSolid(int x, int y, int z) {
 void ChunkManager::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
     WorldGenerator::GenerateChunk(chunk, chunkX, chunkZ);
     ComputeChunkLighting(chunk);
+
+    // wake up the chunk so floating sand can settle
+    chunk.shouldStep = true;
 }
 
 void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
@@ -214,6 +219,48 @@ void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader 
                     DrawModel(chunk.layers[i], { 0,0,0 }, 1.0f, tint);
                 }
             }
+        }
+    }
+}
+
+void ChunkManager::UpdateChunkPhysics() {
+    for (auto& pair : chunks) {
+        Chunk& chunk = pair.second;
+
+        // the Sleep Check
+        // if nothing is moving, skip checks
+        if (!chunk.shouldStep) continue;
+
+        bool moved = false;
+
+        // scan loops
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                for (int y = 0; y < CHUNK_SIZE; y++) {
+
+                    if (chunk.blocks[x][y][z] == BLOCK_SAND) {
+                        if (y > 0) {
+                            if (chunk.blocks[x][y - 1][z] == BLOCK_AIR) {
+                                // swap
+                                chunk.blocks[x][y - 1][z] = BLOCK_SAND;
+                                chunk.blocks[x][y][z] = BLOCK_AIR;
+                                moved = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (moved) {
+            chunk.meshReady = false;
+            // it moved, so it might need to move again next frame. Keep awake.
+            chunk.shouldStep = true;
+        }
+        else {
+            // go to sleep
+            // nothing moved this entire scan. stop checking until the player touches something.
+            chunk.shouldStep = false;
         }
     }
 }
