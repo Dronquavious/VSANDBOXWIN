@@ -233,3 +233,34 @@ Texture2D BlockManager::GenSnowSideTexture(int size) {
     SetTextureFilter(tex, TEXTURE_FILTER_POINT);
     return tex;
 }
+
+Texture2D BlockManager::GenSnowLeavesSideTexture(int size)
+{
+    // base Leaves (Green)
+    Image img = GenImagePerlinNoise(size, size, 0, 0, 5.0f);
+    ImageColorBrightness(&img, -15);
+    ImageColorContrast(&img, -10);
+    ImageColorTint(&img, Color{ 70, 140, 60, 255 }); // Dark Green
+
+    // draw Snow Top (White)
+    Color snowColor = { 240, 242, 245, 255 };
+
+    // draw top 1/3rd as solid snow
+    ImageDrawRectangle(&img, 0, 0, size, size / 3, snowColor);
+
+    // add "Dripping" Snow
+    for (int i = 0; i < size; i++) {
+        if (GetRandomValue(0, 1)) {
+            ImageDrawPixel(&img, i, size / 3, snowColor);
+            // Occasional longer drip
+            if (GetRandomValue(0, 2) == 0) {
+                ImageDrawPixel(&img, i, (size / 3) + 1, snowColor);
+            }
+        }
+    }
+
+    Texture2D tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+    SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+    return tex;
+}

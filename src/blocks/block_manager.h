@@ -17,6 +17,7 @@ public:
     static Texture2D GenSnowTexture(int size);
     static Texture2D GenCactusTexture(int size);
     static Texture2D GenSnowSideTexture(int size);
+    static Texture2D GenSnowLeavesSideTexture(int size);
 };
 
 #endif
