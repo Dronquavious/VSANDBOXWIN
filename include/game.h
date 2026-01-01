@@ -35,7 +35,7 @@ private:
     void EditMap();
 
     void DrawWorld(Color tint);
-    void DrawHand();
+    void DrawHand(Color tint);
     void DrawUI();
 
     void SaveMap();
@@ -51,6 +51,7 @@ private:
     Camera3D camera;
     ChunkManager world;
     Model blockModel;
+    Model skyModel;
 
     // Resources (Assets)
     Texture2D texDirt, texStone, texWood, texGrass, texGrassSide;
@@ -68,6 +69,7 @@ private:
     Texture2D GenSnowTexture(int size);   
     Texture2D GenCactusTexture(int size);
     Texture2D GenSnowSideTexture(int size);
+    Texture2D GenerateSkyTexture();
 
     // shader stuff
     Shader fogShader;

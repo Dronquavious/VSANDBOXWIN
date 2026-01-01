@@ -48,7 +48,7 @@ public:
 	void Init();
 
 	// Draw
-	void UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader);
+	void UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader, Color tint);
 
 	// Block Access
 	int GetBlock(int x, int y, int z, bool createIfMissing = true);

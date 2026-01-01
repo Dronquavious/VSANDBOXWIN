@@ -215,7 +215,7 @@ void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textu
 }
 
 // --- UPDATE AND DRAW ---
-void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader) {
+void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader, Color tint) {
 	int playerCX = (int)floor(playerPos.x / CHUNK_SIZE);
 	int playerCZ = (int)floor(playerPos.z / CHUNK_SIZE);
 	int renderDist = 12;
@@ -233,7 +233,7 @@ void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader 
 			for (int i = 1; i <= 11; i++) {
 				if (chunk.layers[i].meshCount > 0) {
 					chunk.layers[i].materials[0].shader = shader;
-					DrawModel(chunk.layers[i], { 0,0,0 }, 1.0f, WHITE);
+					DrawModel(chunk.layers[i], { 0,0,0 }, 1.0f, tint);
 				}
 			}
 		}
