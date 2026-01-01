@@ -586,16 +586,16 @@ void Game::DrawHand()
 	Texture2D handTexture;
 	switch (currentID)
 	{
-		case 1: handTexture = texDirt; break;
-		case 2: handTexture = texStone; break;
-		case 3: handTexture = texWood; break;
-		case 4: handTexture = texGrass; break;
-		case 5: handTexture = texSand; break;
-		case 6: handTexture = texBedrock; break;
-		case 7: handTexture = texLeaves; break;
-		case 9: handTexture = texSnow; break;
-		case 10: handTexture = texCactus; break;
-		default: handTexture = texDirt; break;
+	case 1: handTexture = texDirt; break;
+	case 2: handTexture = texStone; break;
+	case 3: handTexture = texWood; break;
+	case 4: handTexture = texGrass; break;
+	case 5: handTexture = texSand; break;
+	case 6: handTexture = texBedrock; break;
+	case 7: handTexture = texLeaves; break;
+	case 9: handTexture = texSnow; break;
+	case 10: handTexture = texCactus; break;
+	default: handTexture = texDirt; break;
 	}
 	blockModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = handTexture;
 
