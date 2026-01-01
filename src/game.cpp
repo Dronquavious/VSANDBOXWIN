@@ -279,6 +279,38 @@ void Game::draw()
 	textures[10] = texCactus;
 	textures[11] = texSnowSide;
 
+	// SUN AND MOON
+	// should rotate around player
+	float orbitRadius = 400.0f;
+
+	// angle based on time
+	// 0.0 (Midnight) -> Sun is down (-Y), Moon is up (+Y)
+	// 0.5 (Noon)     -> Sun is up (+Y), Moon is down (-Y)
+
+	// convert time (0-1) to radians (0-2PI)
+	// offset by PI/2 so noon (0.5) is directly overhead
+	float angle = (timeOfDay * 2.0f * PI) - (PI / 2.0f);
+
+	// calculate sun position
+	Vector3 sunPos = {
+		camera.position.x + cosf(angle) * orbitRadius,
+		camera.position.y + sinf(angle) * orbitRadius,
+		camera.position.z // sun moves rast-west, stays on Z plane
+	};
+
+	// calculate moon position (Opposite side of the circle)
+	Vector3 moonPos = {
+		camera.position.x - cosf(angle) * orbitRadius,
+		camera.position.y - sinf(angle) * orbitRadius,
+		camera.position.z
+	};
+
+	// draw Sun (Yellow, Unaffected by Fog)
+	DrawSphere(sunPos, 40.0f, Color{ 255, 255, 200, 255 });
+
+	// draw Moon (White, Unaffected by Fog)
+	DrawSphere(moonPos, 20.0f, Color{ 220, 220, 220, 255 });
+
 	float fogColor[3] = {
 		(float)skyColor.r / 255.0f,
 		(float)skyColor.g / 255.0f,
