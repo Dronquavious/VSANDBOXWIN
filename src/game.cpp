@@ -2,6 +2,7 @@
 #include "raymath.h"
 #include <cmath>
 #include <ctime>
+#include "rlgl.h"
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
@@ -141,9 +142,18 @@ void Game::Init()
 	fogColorLoc = GetShaderLocation(fogShader, "fogColor");
 
 	// default density (How thick the fog is)
-	// 0.015 is a good start. Lower = Clearer, Higher = Thicker
+	// Lower = Clearer, Higher = Thicker
 	float density = 0.005f;
 	SetShaderValue(fogShader, fogDensityLoc, &density, SHADER_UNIFORM_FLOAT);
+
+
+	Mesh skyMesh = GenMeshCube(1.0f, 1.0f, 1.0f);
+	skyModel = LoadModelFromMesh(skyMesh);
+
+	// skybox tex
+	Texture2D skyTex = GenerateSkyTexture();
+	skyModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = skyTex;
+	SetTextureWrap(skyTex, TEXTURE_WRAP_CLAMP);
 
 	world.Init();
 }
@@ -226,50 +236,85 @@ void Game::draw()
 {
 	BeginDrawing();
 
-	// --- DYNAMIC SKY COLOR ---
-	// Simple transition: Sky Blue -> Black -> Sky Blue
-	Color skyColor = SKYBLUE;
+	// brightness based on time
+	// 0.5 = Noon (Brightness 1.0)
+	// 0.0 or 1.0 = Midnight (Brightness 0.2)
 	float brightness = 1.0f;
 
-	if (timeOfDay > 0.5f) // Night is coming
+	if (timeOfDay > 0.5f) // afternoon -> night
 	{
-		// 0.5 to 1.0 -> Interpolate from Blue to Black
+		// 0.5 to 1.0
 		float t = (timeOfDay - 0.5f) * 2.0f; // 0.0 to 1.0
-
-		// Lerp Color
-		skyColor.r = (unsigned char)Lerp(102, 0, t); // SkyBlue R is 102
-		skyColor.g = (unsigned char)Lerp(191, 0, t); // SkyBlue G is 191
-		skyColor.b = (unsigned char)Lerp(255, 0, t); // SkyBlue B is 255
-
 		brightness = 1.0f - t;
-		if (brightness < 0.2f)
-			brightness = 0.2f; // Never purely pitch black
 	}
-	else // Morning/Day
+	else // morning -> noon
 	{
-		// 0.0 to 0.5 -> Interpolate from Black to Blue
+		// 0.0 to 0.5
 		float t = timeOfDay * 2.0f; // 0.0 to 1.0
-
-		skyColor.r = (unsigned char)Lerp(0, 102, t);
-		skyColor.g = (unsigned char)Lerp(0, 191, t);
-		skyColor.b = (unsigned char)Lerp(0, 255, t);
-
 		brightness = t;
-		if (brightness < 0.2f)
-			brightness = 0.2f;
 	}
 
-	ClearBackground(skyColor);
+	// clamp brightness so it never goes Pitch Black (Moonlight)
+	if (brightness < 0.1f) brightness = 0.1f;
+
+	// tint color
+	Color skyTint = {
+		(unsigned char)(255 * brightness),
+		(unsigned char)(255 * brightness),
+		(unsigned char)(255 * brightness),
+		255
+	};
+
+	ClearBackground(BLACK);
 
 	BeginMode3D(camera);
 
-	// apply brightness to the models (Simple lighting)
-	// raylib DrawModel accepts a Tint Color.
-	// use Gray/Black to darken the world at night
-	Color lightTint = { (unsigned char)(255 * brightness),
-					   (unsigned char)(255 * brightness),
-					   (unsigned char)(255 * brightness), 255 };
+	// sky
+	rlDisableDepthMask();
+	rlDisableDepthTest();
 
+	Vector3 skyScale = { -800.0f, 800.0f, 800.0f };
+	DrawModelEx(
+		skyModel,
+		camera.position,
+		{ 0.0f, 1.0f, 0.0f },
+		0.0f,
+		skyScale,
+		skyTint
+	);
+
+	rlEnableDepthTest();
+	rlEnableDepthMask();
+
+	// sun n moon
+	float orbitRadius = 400.0f;
+	float angle = (timeOfDay * 2.0f * PI) - (PI / 2.0f);
+
+	Vector3 sunPos = {
+		camera.position.x + cosf(angle) * orbitRadius,
+		camera.position.y + sinf(angle) * orbitRadius,
+		camera.position.z
+	};
+
+	Vector3 moonPos = {
+		camera.position.x - cosf(angle) * orbitRadius,
+		camera.position.y - sinf(angle) * orbitRadius,
+		camera.position.z
+	};
+
+	// draw sun
+	DrawSphere(sunPos, 40.0f, Color{ 255, 255, 200, 255 });
+	DrawSphere(moonPos, 20.0f, Color{ 220, 220, 220, 255 });
+
+	// update fog shader
+	float horizonR = (200.0f / 255.0f) * brightness;
+	float horizonG = (220.0f / 255.0f) * brightness;
+	float horizonB = (255.0f / 255.0f) * brightness;
+
+	float currentFogColor[3] = { horizonR, horizonG, horizonB };
+	SetShaderValue(fogShader, fogColorLoc, currentFogColor, SHADER_UNIFORM_VEC3);
+
+	// draw world
 	Texture2D textures[12];
 	textures[1] = texDirt;
 	textures[2] = texStone;
@@ -283,53 +328,11 @@ void Game::draw()
 	textures[10] = texCactus;
 	textures[11] = texSnowSide;
 
-	// SUN AND MOON
-	// should rotate around player
-	float orbitRadius = 400.0f;
+	world.UpdateAndDraw(playerPosition, textures, fogShader, skyTint);
 
-	// angle based on time
-	// 0.0 (Midnight) -> Sun is down (-Y), Moon is up (+Y)
-	// 0.5 (Noon)     -> Sun is up (+Y), Moon is down (-Y)
-
-	// convert time (0-1) to radians (0-2PI)
-	// offset by PI/2 so noon (0.5) is directly overhead
-	float angle = (timeOfDay * 2.0f * PI) - (PI / 2.0f);
-
-	// calculate sun position
-	Vector3 sunPos = {
-		camera.position.x + cosf(angle) * orbitRadius,
-		camera.position.y + sinf(angle) * orbitRadius,
-		camera.position.z // sun moves rast-west, stays on Z plane
-	};
-
-	// calculate moon position (Opposite side of the circle)
-	Vector3 moonPos = {
-		camera.position.x - cosf(angle) * orbitRadius,
-		camera.position.y - sinf(angle) * orbitRadius,
-		camera.position.z
-	};
-
-	// draw Sun (Yellow, Unaffected by Fog)
-	DrawSphere(sunPos, 40.0f, Color{ 255, 255, 200, 255 });
-
-	// draw Moon (White, Unaffected by Fog)
-	DrawSphere(moonPos, 20.0f, Color{ 220, 220, 220, 255 });
-
-	float fogColor[3] = {
-		(float)skyColor.r / 255.0f,
-		(float)skyColor.g / 255.0f,
-		(float)skyColor.b / 255.0f
-	};
-	SetShaderValue(fogShader, fogColorLoc, fogColor, SHADER_UNIFORM_VEC3);
-
-
-	// draw the infinite chunks
-	world.UpdateAndDraw(playerPosition, textures, fogShader);
-
-	// --- DRAW BLOCK HIGHLIGHT ---
+	// --- HIGHLIGHT ---
 	if (isBlockSelected)
 	{
-		// draw a wireframe slightly larger than the block so it doesn't clip
 		Vector3 center = {
 			selectedBlockPos.x + 0.5f,
 			selectedBlockPos.y + 0.5f,
@@ -338,7 +341,8 @@ void Game::draw()
 		DrawCubeWires(center, 1.01f, 1.01f, 1.01f, BLACK);
 	}
 
-	DrawHand();
+	DrawHand(skyTint);
+
 	EndMode3D();
 
 	DrawUI();
@@ -354,6 +358,7 @@ void Game::shutDown()
 	UnloadTexture(texWood);
 	UnloadTexture(texGrass);
 	UnloadModel(blockModel);
+	UnloadModel(skyModel);
 	UnloadTexture(texSand);
 	UnloadTexture(texBedrock);
 	UnloadTexture(texLeaves);
@@ -599,7 +604,7 @@ void Game::EditMap()
 	}
 }
 
-void Game::DrawHand()
+void Game::DrawHand(Color tint)
 {
 	bool isMoving = (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_A) || IsKeyDown(KEY_D));
 	if (isMoving)
@@ -643,7 +648,7 @@ void Game::DrawHand()
 	Vector3 rotationAxis = { 0.0f, 0.0f, 1.0f }; // rotate around Z axis (Roll)
 	float rotationAngle = 180.0f;                // flip 180 degrees
 
-	DrawModelEx(blockModel, handPos, rotationAxis, rotationAngle, scale, WHITE);
+	DrawModelEx(blockModel, handPos, rotationAxis, rotationAngle, scale, tint);
 }
 
 void Game::DrawUI()
@@ -1057,6 +1062,75 @@ Texture2D Game::GenSnowSideTexture(int size)
 	SetTextureFilter(tex, TEXTURE_FILTER_POINT);
 	return tex;
 }
+
+Texture2D Game::GenerateSkyTexture()
+{
+	const int width = 64;   // slightly wider = less repetition
+	const int height = 512;
+
+	Image img = GenImageColor(width, height, BLACK);
+	Color* pixels = (Color*)MemAlloc(width * height * sizeof(Color));
+
+	Color zenith = { 100, 160, 255, 255 };
+	Color horizon = { 220, 240, 255, 255 };
+	Color voidCol = { 20, 20, 45, 255 };
+
+	for (int y = 0; y < height; y++)
+	{
+		float t = (float)y / (float)(height - 1);
+
+		// non-linear curve (makes sky feel deeper)
+		float curve = powf(t, 1.3f);
+
+		Color rowColor;
+
+		if (curve < 0.55f)
+		{
+			float localT = curve / 0.55f;
+			rowColor.r = (unsigned char)Lerp(zenith.r, horizon.r, localT);
+			rowColor.g = (unsigned char)Lerp(zenith.g, horizon.g, localT);
+			rowColor.b = (unsigned char)Lerp(zenith.b, horizon.b, localT);
+		}
+		else
+		{
+			float localT = (curve - 0.55f) / 0.45f;
+			rowColor.r = (unsigned char)Lerp(horizon.r, voidCol.r, localT);
+			rowColor.g = (unsigned char)Lerp(horizon.g, voidCol.g, localT);
+			rowColor.b = (unsigned char)Lerp(horizon.b, voidCol.b, localT);
+		}
+
+		// horizon glow band
+		float glow = expf(-powf((t - 0.5f) * 6.0f, 2.0f));
+		rowColor.r = Clamp(rowColor.r + glow * 12, 0, 255);
+		rowColor.g = Clamp(rowColor.g + glow * 12, 0, 255);
+		rowColor.b = Clamp(rowColor.b + glow * 6, 0, 255);
+
+		for (int x = 0; x < width; x++)
+		{
+			// subtle horizontal variation (prevents flat look)
+			float noise = ((x * 13 + y * 7) % 17) / 255.0f;
+
+			Color finalColor = rowColor;
+			finalColor.r = Clamp(finalColor.r + noise * 6, 0, 255);
+			finalColor.g = Clamp(finalColor.g + noise * 6, 0, 255);
+			finalColor.b = Clamp(finalColor.b + noise * 6, 0, 255);
+
+			pixels[y * width + x] = finalColor;
+		}
+	}
+
+	RL_FREE(img.data);
+	img.data = pixels;
+
+	Texture2D tex = LoadTextureFromImage(img);
+	UnloadImage(img);
+
+	// bilinear is correct for skyboxes
+	SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
+
+	return tex;
+}
+
 
 bool Game::IsBlockActive(int x, int y, int z)
 {
