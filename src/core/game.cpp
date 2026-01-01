@@ -9,6 +9,7 @@ void Game::Init() {
     showDebugUI = false;
     messageTimer = 0.0f;
     messageText = "";
+    physicsTimer = 0.0f;
 
     DisableCursor();
     HideCursor();
@@ -19,6 +20,13 @@ void Game::Init() {
 }
 
 void Game::Update() {
+
+    physicsTimer += GetFrameTime();
+    if (physicsTimer >= 0.05f) {
+        physicsTimer -= 0.05f;
+        world.UpdateChunkPhysics();
+    }
+
     // time of day logic
     if (timeMode == 0) { // cycle
         timeOfDay += GetFrameTime() * daySpeed;

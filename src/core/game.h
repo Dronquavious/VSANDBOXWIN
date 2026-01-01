@@ -22,6 +22,7 @@ private:
     float timeOfDay;
     int timeMode;
     float daySpeed;
+    float physicsTimer;
 
     // debug & ui state
     bool showDebugUI;
