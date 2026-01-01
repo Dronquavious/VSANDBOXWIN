@@ -1,23 +1,22 @@
 #include "raylib.h"
-#include "game.h"
-#include "world_gen.h"
+#include "core/game.h"
+#include "world/world_generator.h"
 #include <ctime>
 
-int main()
-{
-    InitWindow(1280, 720, "VOXEL SANDBOX");
+int main() {
+    InitWindow(1600, 900, "VOXEL SANDBOX");
     SetTargetFPS(500);
 
-    WorldGen::worldSeed = GetRandomValue(0, 1000000);
+    WorldGenerator::worldSeed = GetRandomValue(0, 1000000);
     Game game;
-
     game.Init();
-    while (!WindowShouldClose())
-    {
-        game.update();
-        game.draw();
+
+    while (!WindowShouldClose()) {
+        game.Update();
+        game.Draw();
     }
 
+    game.ShutDown();
     CloseWindow();
     return 0;
 }
