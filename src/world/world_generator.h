@@ -19,6 +19,7 @@ private:
     
     // noise helpers
     static float SimpleNoise3D(float x, float y, float z);
+    static void PlaceSnowTree(Chunk& chunk, int x, int y, int z);
     static float GetHeightNoise(int x, int z);
 };
 
