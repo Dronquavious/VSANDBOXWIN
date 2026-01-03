@@ -3,7 +3,7 @@
 #include "../blocks/block_types.h"
 
 void Player::Init() {
-    position = Vector3{ 16.0f, 60.0f, 16.0f };
+    position = Vector3{ 16.0f, 100.0f, 16.0f };
     cameraAngleX = 0.0f;
     cameraAngleY = 0.0f;
     isFlying = true;
@@ -18,8 +18,8 @@ void Player::Init() {
     inventory.slots[4] = { BLOCK_SAND, 64 };
     inventory.slots[5] = { BLOCK_SNOW, 64 };
     inventory.slots[6] = { BLOCK_CACTUS, 64 };
-    inventory.slots[7] = { BLOCK_LEAVES, 64 };
-    inventory.slots[8] = { BLOCK_BEDROCK, 64 };
+    inventory.slots[7] = { BLOCK_TORCH, 64 };
+    inventory.slots[8] = { BLOCK_GLOWSTONE, 64 };
 
     gravity = 0.015f;
     jumpForce = 0.25f;
