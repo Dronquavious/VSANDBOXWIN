@@ -34,20 +34,51 @@ void main() {
 const char* fogFsCode = R"(
 #version 330
 in vec2 fragTexCoord;
-in vec4 fragColor;
+in vec4 fragColor; // R=Sun, G=Torch
 in float fragDist;
+
 out vec4 finalColor;
+
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
+
+// Fog Uniforms
 uniform float fogDensity;
 uniform vec3 fogColor;
-void main() {
+
+// Lighting Uniforms
+uniform float sunBrightness; // 0.0 (Night) to 1.0 (Day)
+
+void main()
+{
     vec4 texColor = texture(texture0, fragTexCoord);
-    vec4 baseColor = texColor * colDiffuse * fragColor;
-    float dist = max(fragDist - 70.0, 0.0);
+    
+    // 1. EXTRACT LIGHT LEVELS
+    float sunLevel = fragColor.r;   // 0.0 to 1.0
+    float torchLevel = fragColor.g; // 0.0 to 1.0
+    
+    // 2. MIX LIGHTING
+    // Dim the sun at night, but keep torches bright
+    float dynamicSun = sunLevel * sunBrightness;
+    
+    // Use MAX so torches overpower the darkness
+    float lightTotal = max(dynamicSun, torchLevel);
+    
+    // 3. AMBIENT FLOOR
+    // Prevent complete pitch blackness. 
+    // Floor is 0.05 at night, 0.2 at day.
+    float ambient = 0.05 + (0.15 * sunBrightness);
+    lightTotal = max(lightTotal, ambient);
+    
+    // Apply Light
+    vec4 litColor = texColor * vec4(lightTotal, lightTotal, lightTotal, 1.0);
+    
+    // 4. APPLY FOG
+    float dist = max(fragDist - 20.0, 0.0);
     float fogFactor = 1.0 / exp(pow(dist * fogDensity, 2.0));
     fogFactor = clamp(fogFactor, 0.0, 1.0);
-    finalColor = mix(vec4(fogColor, 1.0), baseColor, fogFactor);
+    
+    finalColor = mix(vec4(fogColor, 1.0), litColor, fogFactor);
 }
 )";
 
@@ -68,6 +99,8 @@ void Renderer::Init() {
     textures[BLOCK_CACTUS] = BlockManager::GenCactusTexture(BLOCK_TEX_SIZE);
     textures[BLOCK_SNOW_SIDE] = BlockManager::GenSnowSideTexture(BLOCK_TEX_SIZE);
     textures[BLOCK_SNOW_LEAVES] = BlockManager::GenSnowLeavesSideTexture(BLOCK_TEX_SIZE);
+    textures[BLOCK_TORCH] = BlockManager::GenTorchTexture(BLOCK_TEX_SIZE);
+    textures[BLOCK_GLOWSTONE] = BlockManager::GenGlowstoneTexture(BLOCK_TEX_SIZE);
 
     Mesh mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
     blockModel = LoadModelFromMesh(mesh);
@@ -76,6 +109,7 @@ void Renderer::Init() {
     fogShader = LoadShaderFromMemory(fogVsCode, fogFsCode);
     fogDensityLoc = GetShaderLocation(fogShader, "fogDensity");
     fogColorLoc = GetShaderLocation(fogShader, "fogColor");
+    sunBrightnessLoc = GetShaderLocation(fogShader, "sunBrightness");
     float density = 0.005f;
     SetShaderValue(fogShader, fogDensityLoc, &density, SHADER_UNIFORM_FLOAT);
 
@@ -101,10 +135,11 @@ void Renderer::Init() {
     hazeModel = LoadModelFromMesh(hazeMesh);
     texHaze = GenerateHazeTexture();
     hazeModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texHaze;
+
 }
 
 void Renderer::Unload() {
-    for (int i = 1; i <= 12; i++) UnloadTexture(textures[i]);
+    for (int i = 1; i <= 14; i++) UnloadTexture(textures[i]);
     UnloadModel(blockModel);
     UnloadModel(skyModel);
     UnloadModel(cloudModel);
@@ -115,51 +150,74 @@ void Renderer::Unload() {
 }
 
 void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
-    float brightness = 1.0f;
+    // calculate Sun Intensity (0.1 to 1.0)
+    // drives both the Sky Color and the Shader Light Level
+    float sunIntensity = 1.0f;
     if (timeOfDay > 0.5f) {
         float t = (timeOfDay - 0.5f) * 2.0f;
-        brightness = 1.0f - t;
-    } else {
-        float t = timeOfDay * 2.0f;
-        brightness = t;
+        sunIntensity = 1.0f - t;
     }
-    if (brightness < 0.1f) brightness = 0.1f;
+    else {
+        float t = timeOfDay * 2.0f;
+        sunIntensity = t;
+    }
+    if (sunIntensity < 0.1f) sunIntensity = 0.1f;
 
+    // setup Sky Tint
     Color skyTint = {
-        (unsigned char)(255 * brightness),
-        (unsigned char)(255 * brightness),
-        (unsigned char)(255 * brightness),
+        (unsigned char)(255 * sunIntensity),
+        (unsigned char)(255 * sunIntensity),
+        (unsigned char)(255 * sunIntensity),
         255
     };
 
+    // animation
     cloudScroll += GetFrameTime() * 0.005f;
     if (cloudScroll > 1000.0f) cloudScroll = 0.0f;
 
     BeginDrawing();
     ClearBackground(BLACK);
+
     BeginMode3D(player.camera);
 
+    // --- DRAW SKY (Background) ---
+    // disable depth writing/testing so the sky is always "behind" everything
     rlDisableDepthMask();
-    rlDisableDepthTest();
+    rlDisableDepthTest();      // <--- PREVENTS THE "SPLIT SCREEN" GLITCH
     rlDisableBackfaceCulling();
 
     Vector3 skyScale = { -800.0f, 800.0f, 800.0f };
     DrawModelEx(skyModel, player.camera.position, Vector3{ 0.0f, 1.0f, 0.0f }, 0.0f, skyScale, skyTint);
 
+    // Sun & Moon
     float orbitRadius = 400.0f;
     float angle = (timeOfDay * 2.0f * PI) - (PI / 2.0f);
-    Vector3 sunPos = { player.camera.position.x + cosf(angle) * orbitRadius, player.camera.position.y + sinf(angle) * orbitRadius, player.camera.position.z };
-    Vector3 moonPos = { player.camera.position.x - cosf(angle) * orbitRadius, player.camera.position.y - sinf(angle) * orbitRadius, player.camera.position.z };
+    Vector3 sunPos = {
+        player.camera.position.x + cosf(angle) * orbitRadius,
+        player.camera.position.y + sinf(angle) * orbitRadius,
+        player.camera.position.z
+    };
+    Vector3 moonPos = {
+        player.camera.position.x - cosf(angle) * orbitRadius,
+        player.camera.position.y - sinf(angle) * orbitRadius,
+        player.camera.position.z
+    };
     DrawSphere(sunPos, 40.0f, Color{ 255,255,200,255 });
     DrawSphere(moonPos, 20.0f, Color{ 220,220,220,255 });
 
+    // --- DRAW CLOUDS (Transparent) ---
+    // re-enable Depth Test so clouds don't draw on top of each other weirdly
     rlEnableDepthTest();
     BeginBlendMode(BLEND_ALPHA);
-    rlDisableDepthMask();
+    rlDisableDepthMask(); // dont write to depth buffer (transparent objects)
 
     Vector3 camPos = player.camera.position;
+
+    // cloud Layer
     Vector3 cloudPos = camPos;
     cloudPos.y = camPos.y + 80.0f;
+
+    // rotate Clouds
     static float cloudAngle = 0.0f;
     cloudAngle += GetFrameTime() * 2.0f;
     if (cloudAngle > 360.0f) cloudAngle -= 360.0f;
@@ -171,28 +229,33 @@ void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
     Color cloudTint = LerpColor(cloudNight, cloudDay, dayFactor);
 
     DrawModelEx(cloudModel, cloudPos, Vector3{ 0, 1, 0 }, cloudAngle, Vector3{ 1, 1, 1 }, Fade(cloudTint, 0.9f));
-    rlEnableDepthMask();
-    EndBlendMode();
 
-    BeginBlendMode(BLEND_ALPHA);
-    rlDisableDepthMask();
+    // haze Layer
     Color skyDay = Color{ 135, 180, 235, 255 };
     Color skyNight = Color{ 10, 15, 30, 255 };
     Color skyColor = LerpColor(skyNight, skyDay, dayFactor);
+
     Vector3 hazePos = camPos;
     hazePos.y = camPos.y + 50.0f;
-    DrawModelEx(hazeModel, hazePos, Vector3 {0, 1, 0}, 0.0f, Vector3 {1, 1, 1}, Fade(skyColor, 0.9f));
+    DrawModelEx(hazeModel, hazePos, Vector3{ 0, 1, 0 }, 0.0f, Vector3{ 1, 1, 1 }, Fade(skyColor, 0.9f));
+
     rlEnableDepthMask();
     EndBlendMode();
-
     rlEnableBackfaceCulling();
 
-    // update shader
+    // --- DRAW WORLD (Opaque) ---
+
+    // send Sun Brightness to Shader!
+    // without this, the Red Channel (Sunlight) is multiplied by 0 in the shader.
+    SetShaderValue(fogShader, sunBrightnessLoc, &sunIntensity, SHADER_UNIFORM_FLOAT);
+
+    // send Fog Color
     float fogColor[3] = { skyColor.r / 255.0f, skyColor.g / 255.0f, skyColor.b / 255.0f };
     SetShaderValue(fogShader, fogColorLoc, fogColor, SHADER_UNIFORM_VEC3);
 
     world.UpdateAndDraw(player.position, textures, fogShader, skyTint);
 
+    // selection Box
     if (player.isBlockSelected) {
         Vector3 center = {
             player.selectedBlockPos.x + 0.5f,
@@ -203,6 +266,7 @@ void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
     }
 
     DrawHand(player, skyTint);
+
     EndMode3D();
 }
 
@@ -222,13 +286,18 @@ void Renderer::DrawHand(Player& player, Color tint) {
 
     int currentID = player.GetHeldBlockID();
     Texture2D handTexture = textures[1];
-    if (currentID > 0 && currentID <= 11) handTexture = textures[currentID];
+    if (currentID > 0 && currentID <= 14) handTexture = textures[currentID];
+
+    Color handTint = tint;
+    if (currentID == BLOCK_TORCH || currentID == BLOCK_GLOWSTONE) {
+        handTint = WHITE;
+    }
 
     blockModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = handTexture;
     Vector3 scale = { 0.4f, 0.4f, 0.4f };
     Vector3 rotationAxis = { 0.0f, 0.0f, 1.0f }; 
     float rotationAngle = 180.0f;                
-    DrawModelEx(blockModel, handPos, rotationAxis, rotationAngle, scale, tint);
+    DrawModelEx(blockModel, handPos, rotationAxis, rotationAngle, scale, handTint);
 }
 
 void Renderer::DrawUI(Player& player, int screenWidth, int screenHeight, const char* msg, float msgTimer) {
@@ -269,7 +338,7 @@ void Renderer::DrawUI(Player& player, int screenWidth, int screenHeight, const c
             // map real block ID to texture ID (some might share)
             if (blockID == BLOCK_GRASS) previewTex = textures[BLOCK_GRASS_SIDE];
             else if (blockID == BLOCK_SNOW) previewTex = textures[BLOCK_SNOW_SIDE];
-            else if (blockID <= 11) previewTex = textures[blockID];
+            else if (blockID <= 14) previewTex = textures[blockID];
 
             Rectangle sourceRec = { 0.0f, 0.0f, (float)previewTex.width, (float)previewTex.height };
             Rectangle destRec = { (float)x + 4, (float)startY + 4, (float)blockSize - 8, (float)blockSize - 8 };
