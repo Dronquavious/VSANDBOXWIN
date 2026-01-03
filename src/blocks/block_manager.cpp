@@ -5,6 +5,18 @@
 // helper for min/max
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
+static Color LerpColor(Color a, Color b, float t)
+{
+    t = Clamp(t, 0.0f, 1.0f);
+
+    return Color{
+        (unsigned char)(a.r + (b.r - a.r) * t),
+        (unsigned char)(a.g + (b.g - a.g) * t),
+        (unsigned char)(a.b + (b.b - a.b) * t),
+        (unsigned char)(a.a + (b.a - a.a) * t)
+    };
+}
+
 Texture2D BlockManager::GenStoneTexture(int size) {
     Image img = GenImagePerlinNoise(size, size, 0, 0, 8.0f);
     ImageColorBrightness(&img, -40);
@@ -261,6 +273,89 @@ Texture2D BlockManager::GenSnowLeavesSideTexture(int size)
 
     Texture2D tex = LoadTextureFromImage(img);
     UnloadImage(img);
+    SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+    return tex;
+}
+
+Texture2D BlockManager::GenTorchTexture(int size)
+{
+    Image img = GenImageColor(size, size, BLANK);
+    Color* pixels = LoadImageColors(img);
+
+    Color darkRed = { 120, 20, 10, 255 };
+    Color fireOrange = { 255, 140, 30, 255 };
+    Color brightYellow = { 255, 240, 150, 255 };
+
+    for (int y = 0; y < size; y++)
+    {
+        float vertical = 1.0f - (float)y / size; // hotter near top
+
+        for (int x = 0; x < size; x++)
+        {
+            float dx = fabsf(x - size / 2) / (size / 2);
+            float centerFalloff = 1.0f - dx;
+            centerFalloff = Clamp(centerFalloff, 0.0f, 1.0f);
+
+            // jitter / flicker
+            float noise = GetRandomValue(0, 100) / 100.0f;
+            float heat = vertical * centerFalloff + noise * 0.15f;
+            heat = Clamp(heat, 0.0f, 1.0f);
+
+            Color c;
+            if (heat < 0.4f)
+                c = LerpColor(darkRed, fireOrange, heat / 0.4f);
+            else
+                c = LerpColor(fireOrange, brightYellow, (heat - 0.4f) / 0.6f);
+
+            pixels[y * size + x] = c;
+        }
+    }
+
+    UnloadImage(img);
+    Image finalImg = { pixels, size, size, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    Texture2D tex = LoadTextureFromImage(finalImg);
+    UnloadImageColors(pixels);
+
+    SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+    return tex;
+}
+
+Texture2D BlockManager::GenGlowstoneTexture(int size)
+{
+    Image img = GenImageCellular(size, size, size / 4);
+    Color* pixels = LoadImageColors(img);
+
+    Color darkStone  = { 130, 95, 40, 255 };
+    Color midGlow    = { 200, 170, 80, 255 };
+    Color brightGlow = { 255, 245, 170, 255 };
+
+    for (int i = 0; i < size * size; i++)
+    {
+        float v = pixels[i].r / 255.0f;
+
+        // sharpen contrast
+        v = powf(v, 2.2f);
+
+        Color c;
+        if (v < 0.35f)
+            c = darkStone;
+        else if (v < 0.7f)
+            c = LerpColor(darkStone, midGlow, (v - 0.35f) / 0.35f);
+        else
+            c = LerpColor(midGlow, brightGlow, (v - 0.7f) / 0.3f);
+
+        // tiny random sparkle
+        if (GetRandomValue(0, 40) == 0)
+            c = brightGlow;
+
+        pixels[i] = c;
+    }
+
+    UnloadImage(img);
+    Image finalImg = { pixels, size, size, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    Texture2D tex = LoadTextureFromImage(finalImg);
+    UnloadImageColors(pixels);
+
     SetTextureFilter(tex, TEXTURE_FILTER_POINT);
     return tex;
 }
