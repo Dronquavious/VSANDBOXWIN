@@ -16,17 +16,27 @@ in vec3 vertexPosition;
 in vec2 vertexTexCoord;
 in vec4 vertexColor;
 in vec3 vertexNormal;
+
 uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matView;
+
 out vec2 fragTexCoord;
 out vec4 fragColor;
 out float fragDist;
+out vec3 fragPosition; // <--- send World Position to Fragment Shader
+
 void main() {
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
+    
+    // Pass world position directly
+    // (Since chunks are drawn at 0,0,0, vertexPosition IS world position)
+    fragPosition = vertexPosition; 
+
     vec4 viewPos = matView * matModel * vec4(vertexPosition, 1.0);
     fragDist = length(viewPos.xyz);
+    
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )";
@@ -36,46 +46,57 @@ const char* fogFsCode = R"(
 in vec2 fragTexCoord;
 in vec4 fragColor; // R=Sun, G=Torch
 in float fragDist;
+in vec3 fragPosition; // <--- NEW
 
 out vec4 finalColor;
 
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
-// Fog Uniforms
+// Fog
 uniform float fogDensity;
 uniform vec3 fogColor;
 
-// Lighting Uniforms
-uniform float sunBrightness; // 0.0 (Night) to 1.0 (Day)
+// Lighting
+uniform float sunBrightness; 
+
+// Dynamic Hand Light
+uniform vec3 playerLightPos;     
+uniform float playerLightStrength; // (0.0 = Off, 1.0 = On)
 
 void main()
 {
     vec4 texColor = texture(texture0, fragTexCoord);
     
-    // 1. EXTRACT LIGHT LEVELS
-    float sunLevel = fragColor.r;   // 0.0 to 1.0
-    float torchLevel = fragColor.g; // 0.0 to 1.0
+    // 1. STATIC LIGHT (Baked in chunks)
+    float sunLevel = fragColor.r;
+    float torchLevel = fragColor.g;
     
-    // 2. MIX LIGHTING
-    // Dim the sun at night, but keep torches bright
+    // 2. DYNAMIC LIGHT (Handheld)
+    float dist = distance(fragPosition, playerLightPos);
+    // Radius of 15 blocks. 
+    // Formula: 1.0 at center, fades to 0.0 at 15 units away.
+    float dynamicLight = max(0.0, 15.0 - dist) / 15.0; 
+    dynamicLight *= playerLightStrength; // Apply on/off switch
+
+    // 3. MIX LIGHTING
     float dynamicSun = sunLevel * sunBrightness;
     
-    // Use MAX so torches overpower the darkness
-    float lightTotal = max(dynamicSun, torchLevel);
+    // Combine Baked Torch AND Handheld Torch
+    float combinedTorch = max(torchLevel, dynamicLight);
     
-    // 3. AMBIENT FLOOR
-    // Prevent complete pitch blackness. 
-    // Floor is 0.05 at night, 0.2 at day.
+    // Final Calculation
+    float lightTotal = max(dynamicSun, combinedTorch);
+    
+    // Ambient Floor
     float ambient = 0.05 + (0.15 * sunBrightness);
     lightTotal = max(lightTotal, ambient);
     
-    // Apply Light
     vec4 litColor = texColor * vec4(lightTotal, lightTotal, lightTotal, 1.0);
     
-    // 4. APPLY FOG
-    float dist = max(fragDist - 20.0, 0.0);
-    float fogFactor = 1.0 / exp(pow(dist * fogDensity, 2.0));
+    // 4. FOG
+    float fogDistCalc = max(fragDist - 20.0, 0.0);
+    float fogFactor = 1.0 / exp(pow(fogDistCalc * fogDensity, 2.0));
     fogFactor = clamp(fogFactor, 0.0, 1.0);
     
     finalColor = mix(vec4(fogColor, 1.0), litColor, fogFactor);
@@ -110,6 +131,8 @@ void Renderer::Init() {
     fogDensityLoc = GetShaderLocation(fogShader, "fogDensity");
     fogColorLoc = GetShaderLocation(fogShader, "fogColor");
     sunBrightnessLoc = GetShaderLocation(fogShader, "sunBrightness");
+    playerLightPosLoc = GetShaderLocation(fogShader, "playerLightPos");
+    playerLightStrengthLoc = GetShaderLocation(fogShader, "playerLightStrength");
     float density = 0.005f;
     SetShaderValue(fogShader, fogDensityLoc, &density, SHADER_UNIFORM_FLOAT);
 
@@ -162,6 +185,22 @@ void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
         sunIntensity = t;
     }
     if (sunIntensity < 0.1f) sunIntensity = 0.1f;
+
+    // dynamic light
+    int heldID = player.GetHeldBlockID();
+    float lightStrength = 0.0f;
+
+    // If holding Torch or Glowstone (or in the future, a lantern in left hand)
+    if (heldID == BLOCK_TORCH || heldID == BLOCK_GLOWSTONE) {
+        lightStrength = 1.0f;
+    }
+
+    // Send Player Position and Strength
+    // We add a small Y offset (0.5) so the light comes from the chest/hand, not the feet.
+    float pos[3] = { player.position.x, player.position.y + 0.5f, player.position.z };
+
+    SetShaderValue(fogShader, playerLightPosLoc, pos, SHADER_UNIFORM_VEC3);
+    SetShaderValue(fogShader, playerLightStrengthLoc, &lightStrength, SHADER_UNIFORM_FLOAT);
 
     // setup Sky Tint
     Color skyTint = {

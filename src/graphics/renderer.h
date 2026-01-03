@@ -24,6 +24,10 @@ private:
     int fogColorLoc;
     int sunBrightnessLoc;
 
+    // dynamic light uniforms
+    int playerLightPosLoc;
+    int playerLightStrengthLoc;
+
     // environment models
     Model skyModel;
     Model cloudModel;
