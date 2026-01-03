@@ -22,6 +22,7 @@ private:
     Shader fogShader;
     int fogDensityLoc;
     int fogColorLoc;
+    int sunBrightnessLoc;
 
     // environment models
     Model skyModel;
@@ -32,7 +33,7 @@ private:
     // environment textures
     Texture2D texClouds;
     Texture2D texHaze;
-    Texture2D textures[13]; // block textures
+    Texture2D textures[15]; // block textures
 
     // animation state
     float cloudScroll;
