@@ -51,6 +51,7 @@ public:
 
     // draw and update
     void UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader shader, Color tint);
+    void RebuildMesh(int cx, int cz, Texture2D* textures);
     void UpdateChunkPhysics();
 
     // block access

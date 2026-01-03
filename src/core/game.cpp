@@ -6,6 +6,8 @@
 #include "raygui.h"
 
 void Game::Init() {
+	SetExitKey(0); // disables default esc behavior
+
 	// defaults
 	daySpeed = 0.005f;
 	timeOfDay = 0.0f;
@@ -15,6 +17,7 @@ void Game::Init() {
 	messageText = "";
 	physicsTimer = 0.0f;
 
+
 	DisableCursor();
 	HideCursor();
 
@@ -23,6 +26,14 @@ void Game::Init() {
 
 	// init auto-save
 	autoSaveTimer = 0.0f;
+
+	// other defaults
+	strcpy(worldNameBuffer, "New World");
+	strcpy(seedBuffer, "12345");
+	selectedSaveIndex = -1;
+	currentSaveName = "savegame.vxl";
+	editWorldNameMode = false;
+	editSeedMode = false;
 
 	world.Init();
 	player.Init();
@@ -38,6 +49,13 @@ void Game::Update() {
 
 	case STATE_LOADING:
 		UpdateLoading();
+		break;
+
+	case STATE_PAUSE:
+		if (IsKeyPressed(KEY_ESCAPE)) {
+			DisableCursor(); // lock mouse again
+			currentState = STATE_PLAYING;
+		}
 		break;
 
 	case STATE_PLAYING:
@@ -76,24 +94,30 @@ void Game::Update() {
 			// menu mode
 		}
 		else {
-			if (IsKeyPressed(KEY_P)) SaveMap();
-			if (IsKeyPressed(KEY_L)) LoadMap();
+			if (IsKeyPressed(KEY_P)) SaveMap(currentSaveName.c_str());
+			if (IsKeyPressed(KEY_L)) LoadMap(currentSaveName.c_str());
 
 			player.Update(GetFrameTime(), world);
 			player.UpdateRaycast(world);
 			player.HandleInput(world);
 		}
 
-		if (IsKeyPressed(KEY_P)) SaveMap(); // manual Save
+		if (IsKeyPressed(KEY_P)) SaveMap(currentSaveName.c_str()); // manual Save
 
 		// Auto-Save (Every 60 seconds)
 		autoSaveTimer += GetFrameTime();
 		if (autoSaveTimer > 60.0f) {
 			autoSaveTimer = 0.0f;
-			SaveMap();
+			SaveMap(currentSaveName.c_str());
 			messageText = "AUTO SAVED";
 			messageTimer = 2.0f;
 		}
+
+		if (IsKeyPressed(KEY_ESCAPE)) {
+			EnableCursor(); // unlock mouse so we can click buttons
+			currentState = STATE_PAUSE;
+		}
+
 		break;
 	}
 }
@@ -113,6 +137,33 @@ void Game::Draw() {
 	else if (currentState == STATE_LOADING) {
 		DrawLoading();
 	}
+	else if (currentState == STATE_PAUSE) {
+		// draw the game behind it (frozen)
+		renderer.DrawScene(player, world, timeOfDay);
+
+		// semi-transparent black overlay
+		DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.4f));
+
+		// draw Menu
+		int cx = GetScreenWidth() / 2;
+		int cy = GetScreenHeight() / 2;
+
+		DrawText("PAUSED", cx - MeasureText("PAUSED", 40) / 2, cy - 100, 40, WHITE);
+
+		// RESUME
+		if (GuiButton({ (float)cx - 100, (float)cy, 200, 50 }, "RESUME")) {
+			DisableCursor();
+			currentState = STATE_PLAYING;
+		}
+
+		// SAVE & QUIT
+		if (GuiButton({ (float)cx - 100, (float)cy + 70, 200, 50 }, "SAVE & QUIT")) {
+			SaveMap(currentSaveName.c_str()); // save before leaving
+			world.UnloadAll(); // free memory
+			currentState = STATE_MENU;
+		}
+		EndDrawing();
+	}
 }
 
 void Game::ShutDown() {
@@ -120,9 +171,14 @@ void Game::ShutDown() {
 	world.UnloadAll();
 }
 
-void Game::SaveMap() {
+void Game::SaveMap(const char* filename) {
 	// Open file in Binary Mode
-	std::ofstream out("worlds/savegame.vxl", std::ios::binary);
+	if (!DirectoryExists("worlds")) MakeDirectory("worlds");
+
+	std::string path = "worlds/";
+	path += filename;
+
+	std::ofstream out(path, std::ios::binary);
 	if (!out) {
 		messageText = "FAILED TO SAVE GAME";
 		messageTimer = 3.0f;
@@ -153,8 +209,13 @@ void Game::SaveMap() {
 	messageTimer = 2.0f;
 }
 
-bool Game::LoadMap() {
-	std::ifstream in("worlds/savegame.vxl", std::ios::binary);
+bool Game::LoadMap(const char* filename) {
+	
+	if (!DirectoryExists("worlds")) MakeDirectory("worlds");
+	std::string path = "worlds/";
+	path += filename;
+
+	std::ifstream in(path, std::ios::binary);
 
 	if (!in) {
 		messageText = "NO SAVE FILE FOUND";
@@ -205,47 +266,77 @@ void Game::UpdateMenu() {
 void Game::DrawMenu() {
 	BeginDrawing();
 	ClearBackground(RAYWHITE);
+	int cx = GetScreenWidth() / 2;
 
-	int sw = GetScreenWidth();
-	int sh = GetScreenHeight();
-	int cx = sw / 2;
+	DrawText("VOXEL ENGINE", cx - 150, 50, 40, DARKGRAY);
 
-	DrawText("VOXEL ENGINE", cx - MeasureText("VOXEL ENGINE", 40) / 2, 100, 40, DARKGRAY);
+	// --- LEFT SIDE: CREATE WORLD ---
+	GuiGroupBox({ (float)cx - 320, 150, 300, 300 }, "CREATE NEW");
 
-	// NEW GAME BUTTON
-	Rectangle btnNew = { (float)cx - 100, 250, 200, 50 };
-	if (GuiButton(btnNew, "NEW WORLD")) {
-		world.UnloadAll();       // clear old memory
-		WorldGenerator::worldSeed = GetRandomValue(0, 999999);
-		player.Init();           // reset player pos
+	// WORLD NAME INPUT
+	GuiLabel({ (float)cx - 300, 180, 100, 20 }, "World Name:");
+
+	if (GuiTextBox({ (float)cx - 300, 200, 260, 30 }, worldNameBuffer, 64, editWorldNameMode)) {
+		// toggle mode when clicked
+		editWorldNameMode = !editWorldNameMode;
+	}
+
+	// SEED INPUT
+	GuiLabel({ (float)cx - 300, 240, 100, 20 }, "Seed (Number):");
+
+	if (GuiTextBox({ (float)cx - 300, 260, 260, 30 }, seedBuffer, 64, editSeedMode)) {
+		// toggle mode when clicked
+		editSeedMode = !editSeedMode;
+	}
+
+	// create Button
+	if (GuiButton({ (float)cx - 300, 380, 260, 40 }, "CREATE WORLD")) {
+		world.UnloadAll();
+		WorldGenerator::worldSeed = atoi(seedBuffer);
+		player.Init();
 		isNewGame = true;
-		currentState = STATE_LOADING; // go to loading screen
+
+		currentSaveName = std::string(worldNameBuffer) + ".vxl";
+
+		// optional: Save immediately so the file exists
+		SaveMap(currentSaveName.c_str());
+
+		currentState = STATE_LOADING;
 		loadingProgress = 0;
 	}
 
-	Rectangle btnLoad = { (float)cx - 100, 320, 200, 50 };
-	if (GuiButton(btnLoad, "LOAD SAVED WORLD")) {
+	// --- RIGHT SIDE: LOAD WORLD ---
+	GuiGroupBox({ (float)cx + 20, 150, 300, 300 }, "LOAD WORLD");
 
-		// only switch to Loading Screen if the file actually loaded!
-		if (LoadMap()) {
-			isNewGame = false;
-			currentState = STATE_LOADING; // Triggers the visual loading bar
-			loadingProgress = 0;
+	// Refresh List
+	if (GuiButton({ (float)cx + 40, 170, 260, 30 }, "REFRESH LIST")) {
+		saveFiles.clear();
+		FilePathList files = LoadDirectoryFiles("worlds");
+		for (int i = 0; i < files.count; i++) {
+			if (IsFileExtension(files.paths[i], ".vxl")) {
+				saveFiles.push_back(GetFileName(files.paths[i]));
+			}
 		}
+		UnloadDirectoryFiles(files);
 	}
 
-	// RENDER DISTANCE SETTING
-	// create a temporary float for the slider to use
-	float fDist = (float)RENDER_DISTANCE;
-	char distText[32];
-	sprintf(distText, "Render Distance: %d", RENDER_DISTANCE);
-	// Pass the float variable to the slider
-	if (GuiSliderBar({ (float)cx - 100, 400, 200, 20 }, "Low", "High", &fDist, 4, 32)) {
-		// Only update if changed
-		RENDER_DISTANCE = (int)fDist;
-	}
+	// sraw List
+	int y = 210;
+	for (int i = 0; i < saveFiles.size(); i++) {
+		// truncate name if too long for button
+		if (GuiButton({ (float)cx + 40, (float)y, 260, 30 }, saveFiles[i].c_str())) {
 
-	DrawText(distText, cx - MeasureText(distText, 20) / 2, 380, 20, DARKGRAY);
+			// update currentSaveName
+			currentSaveName = saveFiles[i];
+
+			if (LoadMap(currentSaveName.c_str())) {
+				isNewGame = false;
+				currentState = STATE_LOADING;
+				loadingProgress = 0;
+			}
+		}
+		y += 35;
+	}
 
 	EndDrawing();
 }
@@ -272,6 +363,10 @@ void Game::UpdateLoading() {
 
 	// Force Generation
 	world.GetBlock(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
+
+	// need the textures to build the mesh
+	Texture2D* tex = renderer.GetTextures();
+	world.RebuildMesh(cx, cz, tex);
 
 	// move to next chunk
 	currentZ++;

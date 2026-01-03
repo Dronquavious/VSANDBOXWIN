@@ -392,7 +392,7 @@ int ChunkManager::GetLightLevel(int x, int y, int z) {
     int cz = (int)floor((float)z / CHUNK_SIZE);
     ChunkCoord coord = { cx, cz };
 
-    // If chunk doesn't exist, return 15 (Sun) or 0 (Darkness)
+    // If chunk doesnt exist, return 15 (Sun) or 0 (Darkness)
     // returning 0 is safer for preventing underground grid lines
     if (chunks.find(coord) == chunks.end()) return 0;
 
@@ -443,5 +443,16 @@ void ChunkManager::LoadChunks(std::ifstream& in) {
         // flag it to be rebuilt by the renderer
         chunk.meshReady = false;
         chunk.shouldStep = true;
+    }
+}
+
+void ChunkManager::RebuildMesh(int cx, int cz, Texture2D* textures) {
+    ChunkCoord coord = { cx, cz };
+    if (chunks.find(coord) != chunks.end()) {
+        Chunk& chunk = chunks[coord];
+        // only build if needed
+        if (!chunk.meshReady) {
+            BuildChunkMesh(chunk, cx, cz, textures);
+        }
     }
 }
