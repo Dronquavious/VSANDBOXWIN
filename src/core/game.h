@@ -6,6 +6,12 @@
 #include "../player/player.h"
 #include "../graphics/renderer.h"
 
+enum GameState {
+    STATE_MENU,
+    STATE_LOADING,
+    STATE_PLAYING
+};
+
 class Game {
 public:
     void Init();
@@ -30,7 +36,24 @@ private:
     const char* messageText;
 
     void SaveMap();
-    void LoadMap();
+    bool LoadMap();
+    
+    // game state
+    GameState currentState;
+
+    // loading State
+    int loadingProgress;    // 0 to 100
+    bool isNewGame;         // are we generating or loading?
+
+    // Auto-Save
+    float autoSaveTimer;
+
+    // internal Helpers
+    void UpdateMenu();
+    void DrawMenu();
+
+    void UpdateLoading(); // function that loads chunks 1-by-1
+    void DrawLoading();
 };
 
 #endif
