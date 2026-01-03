@@ -5,6 +5,7 @@
 #include "../core/constants.h"
 #include <map>
 #include <vector>
+#include <fstream>
 
 struct Chunk {
     int blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
@@ -57,6 +58,10 @@ public:
     int GetLightLevel(int x, int y, int z);
     void SetBlock(int x, int y, int z, int type);
     bool IsBlockSolid(int x, int y, int z);
+
+    // save/load System
+    void SaveChunks(std::ofstream& out);
+    void LoadChunks(std::ifstream& in);
 
 private:
     std::map<ChunkCoord, Chunk> chunks;

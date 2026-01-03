@@ -401,3 +401,47 @@ int ChunkManager::GetLightLevel(int x, int y, int z) {
 
     return (int)chunks[coord].light[lx][y][lz];
 }
+
+void ChunkManager::SaveChunks(std::ofstream& out) {
+    // write how many chunks we have
+    size_t count = chunks.size();
+    out.write((char*)&count, sizeof(size_t));
+
+    // loop through all chunks
+    for (const auto& pair : chunks) {
+        // write the Coordinate (x, z)
+        out.write((char*)&pair.first, sizeof(ChunkCoord));
+
+        // write the Raw Block Data (32x32x32 ints)
+        out.write((char*)pair.second.blocks, sizeof(pair.second.blocks));
+
+        // write the Raw Light Data (32x32x32 bytes)
+        out.write((char*)pair.second.light, sizeof(pair.second.light));
+    }
+}
+
+void ChunkManager::LoadChunks(std::ifstream& in) {
+    // clear the current world
+    UnloadAll();
+
+    // read how many chunks to load
+    size_t count;
+    in.read((char*)&count, sizeof(size_t));
+
+    // loop and recreate them
+    for (size_t i = 0; i < count; i++) {
+        ChunkCoord coord;
+        in.read((char*)&coord, sizeof(ChunkCoord));
+
+        // create the chunk in the map
+        Chunk& chunk = chunks[coord];
+
+        // read the Raw Data back into memory
+        in.read((char*)chunk.blocks, sizeof(chunk.blocks));
+        in.read((char*)chunk.light, sizeof(chunk.light));
+
+        // flag it to be rebuilt by the renderer
+        chunk.meshReady = false;
+        chunk.shouldStep = true;
+    }
+}

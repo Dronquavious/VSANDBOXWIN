@@ -1,5 +1,7 @@
 #include "game.h"
 #include "../world/world_generator.h"
+#include <fstream>
+#include <cstring>
 
 void Game::Init() {
     // defaults
@@ -76,11 +78,75 @@ void Game::ShutDown() {
 }
 
 void Game::SaveMap() {
-    messageText = "SAVING DISABLED (INFINITE WORLD)";
+    // Open file in Binary Mode
+    std::ofstream out("savegame.vxl", std::ios::binary);
+    if (!out) {
+        messageText = "FAILED TO SAVE GAME";
+        messageTimer = 3.0f;
+        return;
+    }
+
+    // HEADER (Magic Number + Version)
+    const char* magic = "VOXL";
+    int version = 1;
+    out.write(magic, 4);
+    out.write((char*)&version, sizeof(int));
+
+    // WORLD GLOBAL DATA
+    out.write((char*)&WorldGenerator::worldSeed, sizeof(int));
+
+    // PLAYER DATA (Position, Camera, Inventory)
+    // Since Inventory is a simple struct (POD), we can write it directly
+    out.write((char*)&player.position, sizeof(Vector3));
+    out.write((char*)&player.cameraAngleX, sizeof(float));
+    out.write((char*)&player.cameraAngleY, sizeof(float));
+    out.write((char*)&player.inventory, sizeof(Inventory));
+
+    // CHUNK DATA
+    world.SaveChunks(out);
+
+    out.close();
+    messageText = "GAME SAVED!";
     messageTimer = 2.0f;
 }
 
 void Game::LoadMap() {
-    messageText = "LOADING DISABLED (INFINITE WORLD)";
+    std::ifstream in("savegame.vxl", std::ios::binary);
+    if (!in) {
+        messageText = "NO SAVE FILE FOUND";
+        messageTimer = 3.0f;
+        return;
+    }
+
+    // 1. HEADER CHECK
+    char magic[5] = { 0 };
+    in.read(magic, 4);
+    if (strcmp(magic, "VOXL") != 0) {
+        messageText = "INVALID SAVE FILE";
+        messageTimer = 3.0f;
+        return;
+    }
+
+    int version;
+    in.read((char*)&version, sizeof(int));
+
+    // WORLD GLOBAL DATA
+    in.read((char*)&WorldGenerator::worldSeed, sizeof(int));
+
+    // PLAYER DATA
+    in.read((char*)&player.position, sizeof(Vector3));
+    in.read((char*)&player.cameraAngleX, sizeof(float));
+    in.read((char*)&player.cameraAngleY, sizeof(float));
+    in.read((char*)&player.inventory, sizeof(Inventory));
+
+    // recalculate player vectors so you don't snap incorrectly
+    player.forward = { sinf(player.cameraAngleX), 0.0f, cosf(player.cameraAngleX) };
+    player.right = { cosf(player.cameraAngleX), 0.0f, -sinf(player.cameraAngleX) };
+
+    // CHUNK DATA
+    world.LoadChunks(in);
+
+    in.close();
+    messageText = "GAME LOADED!";
     messageTimer = 2.0f;
 }
