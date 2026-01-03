@@ -10,8 +10,8 @@ struct Chunk {
     int blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
     unsigned char light[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // 15 full sun, 0 pitch black
     Model layers[13];
-    bool meshReady; 
-    
+    bool meshReady;
+
     // optimization flag, if false phys ignores this chunk
     bool shouldStep;
 
@@ -22,7 +22,7 @@ struct Chunk {
             for (int y = 0; y < CHUNK_SIZE; y++) {
                 for (int z = 0; z < CHUNK_SIZE; z++) {
                     blocks[x][y][z] = 0;
-                    light[x][y][z] = 15; 
+                    light[x][y][z] = 15;
                 }
             }
         }
@@ -38,6 +38,11 @@ struct ChunkCoord {
     }
 };
 
+struct LightNode {
+    int x, y, z;
+    int val;
+};
+
 class ChunkManager {
 public:
     void Init();
@@ -49,6 +54,7 @@ public:
 
     // block access
     int GetBlock(int x, int y, int z, bool createIfMissing = true);
+    int GetLightLevel(int x, int y, int z);
     void SetBlock(int x, int y, int z, int type);
     bool IsBlockSolid(int x, int y, int z);
 
@@ -58,7 +64,7 @@ private:
     void GenerateChunk(Chunk& chunk, int chunkX, int chunkZ);
     void BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textures);
     void UnloadChunkModels(Chunk& chunk);
-    void ComputeChunkLighting(Chunk& chunk);  
+    void ComputeChunkLighting(Chunk& chunk);
 };
 
 #endif
