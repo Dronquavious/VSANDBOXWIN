@@ -118,7 +118,7 @@ void Game::LoadMap() {
         return;
     }
 
-    // 1. HEADER CHECK
+    // HEADER CHECK
     char magic[5] = { 0 };
     in.read(magic, 4);
     if (strcmp(magic, "VOXL") != 0) {
