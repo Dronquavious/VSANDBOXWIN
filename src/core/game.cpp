@@ -79,7 +79,7 @@ void Game::ShutDown() {
 
 void Game::SaveMap() {
     // Open file in Binary Mode
-    std::ofstream out("savegame.vxl", std::ios::binary);
+    std::ofstream out("worlds/savegame.vxl", std::ios::binary);
     if (!out) {
         messageText = "FAILED TO SAVE GAME";
         messageTimer = 3.0f;
@@ -111,7 +111,7 @@ void Game::SaveMap() {
 }
 
 void Game::LoadMap() {
-    std::ifstream in("savegame.vxl", std::ios::binary);
+    std::ifstream in("worlds/savegame.vxl", std::ios::binary);
     if (!in) {
         messageText = "NO SAVE FILE FOUND";
         messageTimer = 3.0f;
