@@ -1,7 +1,6 @@
 #include "world_generator.h"
 #include "chunk_manager.h" 
 #include "raymath.h"
-#include <raymath.h>
 #include <cstdlib>
 
 int WorldGenerator::worldSeed = 0;
@@ -51,7 +50,7 @@ float WorldGenerator::GetHeightNoise(int x, int z) {
 
 	float finalHeight = 0;
 
-	// rERRAIN SHAPING LOGIC
+	// TERRAIN SHAPING LOGIC
 	if (roughness < 0.5f) {
 		// LAINS (50% of world)
 		// Very flat, minor bumps (+/- 2 blocks)
