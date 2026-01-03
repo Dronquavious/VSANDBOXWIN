@@ -1,7 +1,11 @@
 #include "raylib.h"
 #include "core/game.h"
 #include "world/world_generator.h"
+#include "core/constants.h"
 #include <ctime>
+
+// global var
+int RENDER_DISTANCE = 4;
 
 int main() {
     InitWindow(1600, 900, "VOXEL SANDBOX");

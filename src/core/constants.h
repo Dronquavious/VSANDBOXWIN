@@ -3,8 +3,10 @@
 
 // world settings
 #define CHUNK_SIZE 64
-#define RENDER_DISTANCE 8
 #define SEA_LEVEL 28
+
+// changeable in settings
+extern int RENDER_DISTANCE;
 
 // texture settings
 #define BLOCK_TEX_SIZE 16
