@@ -4,9 +4,13 @@
 #include "core/constants.h"
 #include <ctime>
 
-// global var
+// render distance setting
 int RENDER_DISTANCE = 4;
 
+/**
+ * entry point for the application
+ * initializes window, game, and main loop
+ */
 int main() {
     InitWindow(1600, 900, "VOXEL SANDBOX");
     SetTargetFPS(500);

@@ -6,6 +6,9 @@
 #include "../player/player.h"
 #include "../graphics/renderer.h"
 
+/**
+ * main game state enum
+ */
 enum GameState {
 	STATE_MENU,
 	STATE_LOADING,
@@ -13,6 +16,10 @@ enum GameState {
 	STATE_PAUSE
 };
 
+/**
+ * core game controller
+ * manages main loop, states, input, and subsystems
+ */
 class Game {
 public:
 	void Init();

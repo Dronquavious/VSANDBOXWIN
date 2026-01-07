@@ -5,6 +5,10 @@
 #include "inventory.h"
 #include "../world/chunk_manager.h"
 
+/**
+ * controls the first person camera and player physics
+ * handles movement, collision, and world interaction
+ */
 class Player {
 public:
     Vector3 position;
@@ -19,21 +23,33 @@ public:
     bool isFlying;
     float verticalVelocity;
     
-    // camera angles
+    // camera orientation
     float cameraAngleX;
     float cameraAngleY;
     Vector3 forward;
     Vector3 right;
 
-    // editing state
+    // interaction state
     bool isBlockSelected;
     Vector3 selectedBlockPos;
     Vector3 selectedNormal;
 
     void Init();
+
+    /**
+     * updates physics and movement logic
+     */
     void Update(float dt, ChunkManager& world);
+
+    /**
+     * performs raycasting for block selection
+     */
     void UpdateRaycast(ChunkManager& world);
-    void HandleInput(ChunkManager& world); // handling breaking/placing
+
+    /**
+     * handles block breaking and placement input
+     */
+    void HandleInput(ChunkManager& world); 
     
     int GetHeldBlockID() {
         return inventory.slots[inventory.selectedSlot].blockID;

@@ -7,8 +7,15 @@
 // forward declaration to avoid circular includes
 struct Chunk; 
 
+/**
+ * static class for procedural terrain generation
+ * uses noise functions to generate blocks and biomes
+ */
 class WorldGenerator {
 public:
+    /**
+     * generating terrain data for a single chunk (blocks only)
+     */
     static void GenerateChunk(Chunk& chunk, int chunkX, int chunkZ);
     static int worldSeed;
 

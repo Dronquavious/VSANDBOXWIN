@@ -5,6 +5,9 @@
 
 #include "raygui.h"
 
+/**
+ * initializes game systems, defaults, and states
+ */
 void Game::Init() {
 	SetExitKey(0); // disables default esc behavior
 
@@ -40,6 +43,10 @@ void Game::Init() {
 	renderer.Init();
 }
 
+/**
+ * main update loop
+ * delegates to sub-update functions based on state
+ */
 void Game::Update() {
 
 	switch (currentState) {
@@ -122,6 +129,10 @@ void Game::Update() {
 	}
 }
 
+/**
+ * main draw loop
+ * delegates to renderer and sub-draw functions
+ */
 void Game::Draw() {
 	if (currentState == STATE_PLAYING) {
 		renderer.DrawScene(player, world, timeOfDay);
@@ -209,6 +220,9 @@ void Game::SaveMap(const char* filename) {
 	messageTimer = 2.0f;
 }
 
+/**
+ * loads world data from binary file
+ */
 bool Game::LoadMap(const char* filename) {
 	
 	if (!DirectoryExists("worlds")) MakeDirectory("worlds");
@@ -341,6 +355,9 @@ void Game::DrawMenu() {
 	EndDrawing();
 }
 
+/**
+ * handles partial chunk loading during loading screen
+ */
 void Game::UpdateLoading() {
 	// Goal: Pre-load the chunks around the player before starting.
 	int loadRadius = 6;

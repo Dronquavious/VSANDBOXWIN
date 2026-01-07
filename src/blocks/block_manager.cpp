@@ -5,6 +5,10 @@
 // helper for min/max
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
+/**
+ * linearly interpolates between two colors
+ * t is clamped between 0.0 and 1.0
+ */
 static Color LerpColor(Color a, Color b, float t)
 {
     t = Clamp(t, 0.0f, 1.0f);
@@ -38,6 +42,9 @@ Texture2D BlockManager::GenWoodTexture(int size) {
     return tex;
 }
 
+/**
+ * generates a procedural sand texture
+ */
 Texture2D BlockManager::GenSandTexture(int size) {
     Image img = GenImageColor(size, size, BLANK);
     Color* pixels = LoadImageColors(img);
@@ -62,7 +69,7 @@ Texture2D BlockManager::GenSandTexture(int size) {
                 sand.b -= 15;
             }
 
-            // if we are at the edge of the block, darken the color
+            // darken edges
             if (x == 0 || x == size - 1 || y == 0 || y == size - 1) {
                 float edgeNoise = 0.92f + GetRandomValue(0, 4) * 0.01f;
                 sand.r *= edgeNoise;
@@ -246,15 +253,18 @@ Texture2D BlockManager::GenSnowSideTexture(int size) {
     return tex;
 }
 
+/**
+ * generates snow-covered leaves texture
+ */
 Texture2D BlockManager::GenSnowLeavesSideTexture(int size)
 {
-    // base Leaves (Green)
+    // base leaves (green)
     Image img = GenImagePerlinNoise(size, size, 0, 0, 5.0f);
     ImageColorBrightness(&img, -15);
     ImageColorContrast(&img, -10);
     ImageColorTint(&img, Color{ 70, 140, 60, 255 }); // Dark Green
 
-    // draw Snow Top (White)
+    // draw snow top (white)
     Color snowColor = { 240, 242, 245, 255 };
 
     // draw top 1/3rd as solid snow

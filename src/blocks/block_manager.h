@@ -3,9 +3,13 @@
 
 #include "raylib.h"
 
+/**
+ * static utility class for procedural texture generation
+ * creates textures for blocks at runtime
+ */
 class BlockManager {
 public:
-    // generates all block textures
+    // procedural texture generators
     static Texture2D GenStoneTexture(int size);
     static Texture2D GenDirtTexture(int size);
     static Texture2D GenGrassTexture(int size);

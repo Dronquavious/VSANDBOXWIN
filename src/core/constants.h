@@ -1,14 +1,14 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-// world settings
+// world generation settings
 #define CHUNK_SIZE 64
 #define SEA_LEVEL 28
 
-// changeable in settings
+// render settings (modified by main)
 extern int RENDER_DISTANCE;
 
-// texture settings
+// texture atlas settings
 #define BLOCK_TEX_SIZE 16
 
 // helper macros
