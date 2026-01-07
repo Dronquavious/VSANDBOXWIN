@@ -17,8 +17,11 @@ void ChunkManager::UnloadAll() {
     chunks.clear();
 }
 
+/**
+ * frees all gpu models associated with the chunk
+ */
 void ChunkManager::UnloadChunkModels(Chunk& chunk) {
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < (int)BlockType::COUNT; i++) {
         if (chunk.layers[i].meshCount > 0) {
             UnloadModel(chunk.layers[i]);
             chunk.layers[i] = { 0 };
@@ -27,8 +30,11 @@ void ChunkManager::UnloadChunkModels(Chunk& chunk) {
     chunk.meshReady = false;
 }
 
-int ChunkManager::GetBlock(int x, int y, int z, bool createIfMissing) {
-    if (y < 0 || y >= CHUNK_SIZE) return 0;
+/**
+ * retrieves a block type from global coordinates
+ */
+BlockType ChunkManager::GetBlock(int x, int y, int z, bool createIfMissing) {
+    if (y < 0 || y >= CHUNK_SIZE) return BlockType::AIR;
 
     int cx = (int)floor((float)x / CHUNK_SIZE);
     int cz = (int)floor((float)z / CHUNK_SIZE);
@@ -36,7 +42,7 @@ int ChunkManager::GetBlock(int x, int y, int z, bool createIfMissing) {
 
     if (chunks.find(coord) == chunks.end()) {
         if (createIfMissing) GenerateChunk(chunks[coord], cx, cz);
-        else return 0;
+        else return BlockType::AIR;
     }
 
     int lx = ((x % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
@@ -45,7 +51,10 @@ int ChunkManager::GetBlock(int x, int y, int z, bool createIfMissing) {
     return chunks[coord].blocks[lx][y][lz];
 }
 
-void ChunkManager::SetBlock(int x, int y, int z, int type) {
+/**
+ * sets a block and updates lighting/meshes
+ */
+void ChunkManager::SetBlock(int x, int y, int z, BlockType type) {
     if (y < 0 || y >= CHUNK_SIZE) return;
 
     int cx = (int)floor((float)x / CHUNK_SIZE);
@@ -57,25 +66,25 @@ void ChunkManager::SetBlock(int x, int y, int z, int type) {
     int lx = ((x % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
     int lz = ((z % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
 
-    // update the Block
+    // update the block
     chunks[coord].blocks[lx][y][lz] = type;
 
-    // RECALCULATE LIGHTING
-    // Now that a block changed (maybe a torch placed, or stone broken opening a skylight),
-    // re-run the BFS to spread the light.
+    // recalculate lighting
     ComputeChunkLighting(chunks[coord]);
 
-    // rebuild Mesh
+    // rebuild mesh
     chunks[coord].meshReady = false;
     chunks[coord].shouldStep = true;
-
-    // TODO MAYBE OPTIONAL: If we are on the edge of a chunk, we should technically 
-    // update the neighbor chunks too, but lets stick to this for now 
-    // to keep performance high.
+    
+    // update neighbors
+    if (lx == 0) RebuildMesh(cx - 1, cz, nullptr);
+    if (lx == CHUNK_SIZE - 1) RebuildMesh(cx + 1, cz, nullptr);
+    if (lz == 0) RebuildMesh(cx, cz - 1, nullptr);
+    if (lz == CHUNK_SIZE - 1) RebuildMesh(cx, cz + 1, nullptr);
 }
 
 bool ChunkManager::IsBlockSolid(int x, int y, int z) {
-    return GetBlock(x, y, z) != 0;
+    return GetBlock(x, y, z) != BlockType::AIR;
 }
 
 void ChunkManager::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
@@ -106,9 +115,9 @@ void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
             // SUNLIGHT (Column Scan)
             bool sunBlocked = false;
             for (int y = CHUNK_SIZE - 1; y >= 0; y--) {
-                int block = chunk.blocks[x][y][z];
+                BlockType block = chunk.blocks[x][y][z];
                 // Light passes through Air, Leaves, and Torches
-                bool solid = (block != 0 && block != 7 && block != 12 && block != 13);
+                bool solid = (block != BlockType::AIR && block != BlockType::LEAVES && block != BlockType::SNOW_LEAVES && block != BlockType::TORCH && block != BlockType::GLOWSTONE);
 
                 if (!sunBlocked) {
                     if (solid) {
@@ -124,8 +133,8 @@ void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
 
             // TORCHLIGHT (Scan for emitters)
             for (int y = 0; y < CHUNK_SIZE; y++) {
-                int block = chunk.blocks[x][y][z];
-                if (block == BLOCK_TORCH || block == BLOCK_GLOWSTONE) {
+                BlockType block = chunk.blocks[x][y][z];
+                if (block == BlockType::TORCH || block == BlockType::GLOWSTONE) {
                     // Set Torch Bit (Low Nibble) to 14 (Torches aren't fully 15 bright usually)
                     chunk.light[x][y][z] |= 14;
                     torchQueue.push({ x, y, z, 14 });
@@ -147,8 +156,8 @@ void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
             int nz = node.z + neighbors[i][2];
 
             if (nx >= 0 && nx < CHUNK_SIZE && ny >= 0 && ny < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
-                int block = chunk.blocks[nx][ny][nz];
-                bool solid = (block != 0 && block != 7 && block != 12 && block != 13);
+                BlockType block = chunk.blocks[nx][ny][nz];
+                bool solid = (block != BlockType::AIR && block != BlockType::LEAVES && block != BlockType::SNOW_LEAVES && block != BlockType::TORCH && block != BlockType::GLOWSTONE);
 
                 if (!solid) {
                     int currentSun = (chunk.light[nx][ny][nz] >> 4) & 0xF;
@@ -177,8 +186,8 @@ void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
             int nz = node.z + neighbors[i][2];
 
             if (nx >= 0 && nx < CHUNK_SIZE && ny >= 0 && ny < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
-                int block = chunk.blocks[nx][ny][nz];
-                bool solid = (block != 0 && block != 7 && block != 12 && block != 13);
+                BlockType block = chunk.blocks[nx][ny][nz];
+                bool solid = (block != BlockType::AIR && block != BlockType::LEAVES && block != BlockType::SNOW_LEAVES && block != BlockType::TORCH && block != BlockType::GLOWSTONE);
 
                 if (!solid) {
                     int currentTorch = chunk.light[nx][ny][nz] & 0xF;
@@ -195,36 +204,92 @@ void ChunkManager::ComputeChunkLighting(Chunk& chunk) {
     }
 }
 
+// Memory Pool
+static std::vector<float> poolVertices[(int)BlockType::COUNT];
+static std::vector<float> poolTexcoords[(int)BlockType::COUNT];
+static std::vector<unsigned char> poolColors[(int)BlockType::COUNT];
+
+/**
+ * generates mesh data for a chunk using neighbor caching and memory pooling
+ */
 void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textures) {
     UnloadChunkModels(chunk);
 
-    std::vector<float> vertices[15];
-    std::vector<float> texcoords[15];
-    std::vector<unsigned char> colors[15];
+    // 1. neighbor caching
+    Chunk* neighbors[3][3];
+    for (int nx = -1; nx <= 1; nx++) {
+        for (int nz = -1; nz <= 1; nz++) {
+            ChunkCoord coord = { cx + nx, cz + nz };
+            auto it = chunks.find(coord);
+            if (it != chunks.end()) {
+                neighbors[nx + 1][nz + 1] = &it->second;
+            } else {
+                neighbors[nx + 1][nz + 1] = nullptr;
+            }
+        }
+    }
 
-    auto getLight = [&](int x, int y, int z) {
-        // convert local chunk coords to global world coords
-        int globalX = (cx * CHUNK_SIZE) + x;
-        int globalY = y;
-        int globalZ = (cz * CHUNK_SIZE) + z;
+    // 2. clear pools
+    for (int i = 0; i < (int)BlockType::COUNT; i++) {
+        poolVertices[i].clear();
+        poolTexcoords[i].clear();
+        poolColors[i].clear();
+    }
 
-        // find real light level
-        return GetLightLevel(globalX, globalY, globalZ);
-        };
+    auto getLightFast = [&](int localX, int localY, int localZ) -> int {
+        // handle y out of bounds
+        if (localY < 0) return 0;
+        if (localY >= CHUNK_SIZE) return 15;
+
+        // handle x/z out of bounds
+        int nx = 1;
+        int nz = 1;
+        int lx = localX;
+        int lz = localZ;
+
+        if (localX < 0) { nx = 0; lx += CHUNK_SIZE; }
+        else if (localX >= CHUNK_SIZE) { nx = 2; lx -= CHUNK_SIZE; }
+        
+        if (localZ < 0) { nz = 0; lz += CHUNK_SIZE; }
+        else if (localZ >= CHUNK_SIZE) { nz = 2; lz -= CHUNK_SIZE; }
+
+        Chunk* c = neighbors[nx][nz];
+        if (c) return (int)c->light[lx][localY][lz];
+        return 0;
+    };
+
+    auto getBlockFast = [&](int localX, int localY, int localZ) -> BlockType {
+        if (localY < 0 || localY >= CHUNK_SIZE) return BlockType::AIR;
+        
+        int nx = 1;
+        int nz = 1;
+        int lx = localX;
+        int lz = localZ;
+
+        if (localX < 0) { nx = 0; lx += CHUNK_SIZE; }
+        else if (localX >= CHUNK_SIZE) { nx = 2; lx -= CHUNK_SIZE; }
+
+        if (localZ < 0) { nz = 0; lz += CHUNK_SIZE; }
+        else if (localZ >= CHUNK_SIZE) { nz = 2; lz -= CHUNK_SIZE; }
+        
+        Chunk* c = neighbors[nx][nz];
+        if (c) return c->blocks[lx][localY][lz];
+        return BlockType::AIR;
+    };
 
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_SIZE; y++) {
             for (int z = 0; z < CHUNK_SIZE; z++) {
-                int blockID = chunk.blocks[x][y][z];
-                if (blockID == 0) continue;
+                BlockType blockID = chunk.blocks[x][y][z];
+                if (blockID == BlockType::AIR) continue;
 
                 // culling checks
-                bool top = (y == CHUNK_SIZE - 1) || (chunk.blocks[x][y + 1][z] == 0);
-                bool bottom = (y > 0) && (chunk.blocks[x][y - 1][z] == 0);
-                bool left = (x == 0) || (chunk.blocks[x - 1][y][z] == 0);
-                bool right = (x == CHUNK_SIZE - 1) || (chunk.blocks[x + 1][y][z] == 0);
-                bool front = (z == CHUNK_SIZE - 1) || (chunk.blocks[x][y][z + 1] == 0);
-                bool back = (z == 0) || (chunk.blocks[x][y][z - 1] == 0);
+                bool top = (y == CHUNK_SIZE - 1) || (getBlockFast(x, y + 1, z) == BlockType::AIR);
+                bool bottom = (y > 0) && (getBlockFast(x, y - 1, z) == BlockType::AIR);
+                bool left = (getBlockFast(x - 1, y, z) == BlockType::AIR);
+                bool right = (getBlockFast(x + 1, y, z) == BlockType::AIR);
+                bool front = (getBlockFast(x, y, z + 1) == BlockType::AIR);
+                bool back = (getBlockFast(x, y, z - 1) == BlockType::AIR);
 
                 if (!top && !bottom && !left && !right && !front && !back) continue;
 
@@ -234,49 +299,44 @@ void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textu
 
                 auto pushFace = [&](int renderID, float* vData, float* uvData, int lightLevel) {
 
-                    // DECODE LIGHT (Packed Byte)
-                    int sun = (lightLevel >> 4) & 0xF; // High 4 bits
-                    int torch = lightLevel & 0xF;      // Low 4 bits
+                    // decode light
+                    int sun = (lightLevel >> 4) & 0xF;
+                    int torch = lightLevel & 0xF;
 
-                    // convert 0-15 int to 0-255 byte
+                    // convert to byte
                     int r = (int)((float)sun / 15.0f * 255.0f);
                     int g = (int)((float)torch / 15.0f * 255.0f);
 
-                    // PACK INTO COLOR
-                    // R = Sun Level
-                    // G = Torch Level
-                    // B = 0 (Unused for now)
-                    // A = 255
                     Color c = { (unsigned char)r, (unsigned char)g, 0, 255 };
 
-                    for (int k = 0; k < 18; k++) vertices[renderID].push_back(vData[k]);
-                    for (int k = 0; k < 12; k++) texcoords[renderID].push_back(uvData[k]);
+                    for (int k = 0; k < 18; k++) poolVertices[renderID].push_back(vData[k]);
+                    for (int k = 0; k < 12; k++) poolTexcoords[renderID].push_back(uvData[k]);
                     for (int k = 0; k < 6; k++) {
-                        colors[renderID].push_back(c.r);
-                        colors[renderID].push_back(c.g);
-                        colors[renderID].push_back(c.b);
-                        colors[renderID].push_back(c.a);
+                        poolColors[renderID].push_back(c.r);
+                        poolColors[renderID].push_back(c.g);
+                        poolColors[renderID].push_back(c.b);
+                        poolColors[renderID].push_back(c.a);
                     }
-                    };
+                };
 
-                auto getRenderID = [&](bool isTop, bool isBottom) {
-                    if (blockID == BLOCK_GRASS) {
-                        if (isTop) return (int)BLOCK_GRASS;
-                        if (isBottom) return (int)BLOCK_DIRT;
-                        return (int)BLOCK_GRASS_SIDE;
+                auto getRenderID = [&](bool isTop, bool isBottom) -> int {
+                    if (blockID == BlockType::GRASS) {
+                        if (isTop) return (int)BlockType::GRASS;
+                        if (isBottom) return (int)BlockType::DIRT;
+                        return (int)BlockType::GRASS_SIDE;
                     }
-                    if (blockID == BLOCK_SNOW) {
-                        if (isTop) return (int)BLOCK_SNOW;
-                        if (isBottom) return (int)BLOCK_DIRT;
-                        return (int)BLOCK_SNOW_SIDE;
+                    if (blockID == BlockType::SNOW) {
+                        if (isTop) return (int)BlockType::SNOW;
+                        if (isBottom) return (int)BlockType::DIRT;
+                        return (int)BlockType::SNOW_SIDE;
                     }
-                    if (blockID == BLOCK_SNOW_LEAVES) {
-                        if (isTop) return (int)BLOCK_SNOW;    // reuse snow top
-                        if (isBottom) return (int)BLOCK_LEAVES; // reuse leaf bottom
-                        return (int)BLOCK_SNOW_LEAVES;        // side with drip
+                    if (blockID == BlockType::SNOW_LEAVES) {
+                        if (isTop) return (int)BlockType::SNOW;
+                        if (isBottom) return (int)BlockType::LEAVES;
+                        return (int)BlockType::SNOW_LEAVES;
                     }
-                    return blockID;
-                    };
+                    return (int)blockID;
+                };
 
                 float fFront[] = { gx, gy, gz + 1, gx + 1, gy, gz + 1, gx + 1, gy + 1, gz + 1, gx, gy, gz + 1, gx + 1, gy + 1, gz + 1, gx, gy + 1, gz + 1 };
                 float uvFront[] = { 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0 };
@@ -285,36 +345,40 @@ void ChunkManager::BuildChunkMesh(Chunk& chunk, int cx, int cz, Texture2D* textu
                 float fTop[] = { gx, gy + 1, gz + 1, gx + 1, gy + 1, gz + 1, gx + 1, gy + 1, gz, gx, gy + 1, gz + 1, gx + 1, gy + 1, gz, gx, gy + 1, gz };
                 float uvTop[] = { 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0 };
                 float fBottom[] = { gx, gy, gz, gx + 1, gy, gz, gx, gy, gz + 1, gx, gy, gz + 1, gx + 1, gy, gz, gx + 1, gy, gz + 1 };
-                float uvBottom[] = { 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0 };
+                float uvBottom[] = { 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0 }; 
                 float fRight[] = { gx + 1, gy, gz + 1, gx + 1, gy, gz, gx + 1, gy + 1, gz, gx + 1, gy, gz + 1, gx + 1, gy + 1, gz, gx + 1, gy + 1, gz + 1 };
                 float uvRight[] = { 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0 };
                 float fLeft[] = { gx, gy, gz, gx, gy, gz + 1, gx, gy + 1, gz + 1, gx, gy, gz, gx, gy + 1, gz + 1, gx, gy + 1, gz };
                 float uvLeft[] = { 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0 };
 
-                if (front)  pushFace(getRenderID(false, false), fFront, uvFront, getLight(x, y, z + 1));
-                if (back)   pushFace(getRenderID(false, false), fBack, uvBack, getLight(x, y, z - 1));
-                if (top)    pushFace(getRenderID(true, false), fTop, uvTop, getLight(x, y + 1, z));
-                if (bottom) pushFace(getRenderID(false, true), fBottom, uvBottom, getLight(x, y - 1, z));
-                if (right)  pushFace(getRenderID(false, false), fRight, uvRight, getLight(x + 1, y, z));
-                if (left)   pushFace(getRenderID(false, false), fLeft, uvLeft, getLight(x - 1, y, z));
+                if (front)  pushFace(getRenderID(false, false), fFront, uvFront, getLightFast(x, y, z + 1));
+                if (back)   pushFace(getRenderID(false, false), fBack, uvBack, getLightFast(x, y, z - 1));
+                if (top)    pushFace(getRenderID(true, false), fTop, uvTop, getLightFast(x, y + 1, z));
+                if (bottom) pushFace(getRenderID(false, true), fBottom, uvBottom, getLightFast(x, y - 1, z));
+                if (right)  pushFace(getRenderID(false, false), fRight, uvRight, getLightFast(x + 1, y, z));
+                if (left)   pushFace(getRenderID(false, false), fLeft, uvLeft, getLightFast(x - 1, y, z));
             }
         }
     }
 
-    for (int i = 1; i <= 14; i++) {
-        if (vertices[i].empty()) continue;
+    for (int i = 1; i < (int)BlockType::COUNT; i++) {
+        if (poolVertices[i].empty()) continue;
         Mesh mesh = { 0 };
-        mesh.vertexCount = (int)vertices[i].size() / 3;
+        mesh.vertexCount = (int)poolVertices[i].size() / 3;
         mesh.triangleCount = mesh.vertexCount / 3;
-        mesh.vertices = (float*)MemAlloc((unsigned int)(vertices[i].size() * sizeof(float)));
-        mesh.texcoords = (float*)MemAlloc((unsigned int)(texcoords[i].size() * sizeof(float)));
-        mesh.colors = (unsigned char*)MemAlloc((unsigned int)(colors[i].size() * sizeof(unsigned char)));
-        memcpy(mesh.vertices, vertices[i].data(), vertices[i].size() * sizeof(float));
-        memcpy(mesh.texcoords, texcoords[i].data(), texcoords[i].size() * sizeof(float));
-        memcpy(mesh.colors, colors[i].data(), colors[i].size() * sizeof(unsigned char));
+        mesh.vertices = (float*)MemAlloc((unsigned int)(poolVertices[i].size() * sizeof(float)));
+        mesh.texcoords = (float*)MemAlloc((unsigned int)(poolTexcoords[i].size() * sizeof(float)));
+        mesh.colors = (unsigned char*)MemAlloc((unsigned int)(poolColors[i].size() * sizeof(unsigned char)));
+        memcpy(mesh.vertices, poolVertices[i].data(), poolVertices[i].size() * sizeof(float));
+        memcpy(mesh.texcoords, poolTexcoords[i].data(), poolTexcoords[i].size() * sizeof(float));
+        memcpy(mesh.colors, poolColors[i].data(), poolColors[i].size() * sizeof(unsigned char));
         UploadMesh(&mesh, false);
         chunk.layers[i] = LoadModelFromMesh(mesh);
-        chunk.layers[i].materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = textures[i];
+        
+        // safety check for nullptr textures if not loaded yet
+        if (textures) {
+            chunk.layers[i].materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = textures[i];
+        }
     }
     chunk.meshReady = true;
 }
@@ -333,7 +397,7 @@ void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader 
             if (!chunk.meshReady) {
                 BuildChunkMesh(chunk, cx, cz, textures);
             }
-            for (int i = 1; i <= 14; i++) {
+            for (int i = 1; i < (int)BlockType::COUNT; i++) {
                 if (chunk.layers[i].meshCount > 0) {
                     chunk.layers[i].materials[0].shader = shader;
                     DrawModel(chunk.layers[i], { 0,0,0 }, 1.0f, tint);
@@ -343,12 +407,14 @@ void ChunkManager::UpdateAndDraw(Vector3 playerPos, Texture2D* textures, Shader 
     }
 }
 
+/**
+ * updates cellular automata processes (e.g. sand falling)
+ */
 void ChunkManager::UpdateChunkPhysics() {
     for (auto& pair : chunks) {
         Chunk& chunk = pair.second;
 
-        // the Sleep Check
-        // if nothing is moving, skip checks
+        // sleep check
         if (!chunk.shouldStep) continue;
 
         bool moved = false;
@@ -358,12 +424,12 @@ void ChunkManager::UpdateChunkPhysics() {
             for (int z = 0; z < CHUNK_SIZE; z++) {
                 for (int y = 0; y < CHUNK_SIZE; y++) {
 
-                    if (chunk.blocks[x][y][z] == BLOCK_SAND) {
+                    if (chunk.blocks[x][y][z] == BlockType::SAND) {
                         if (y > 0) {
-                            if (chunk.blocks[x][y - 1][z] == BLOCK_AIR) {
+                            if (chunk.blocks[x][y - 1][z] == BlockType::AIR) {
                                 // swap
-                                chunk.blocks[x][y - 1][z] = BLOCK_SAND;
-                                chunk.blocks[x][y][z] = BLOCK_AIR;
+                                chunk.blocks[x][y - 1][z] = BlockType::SAND;
+                                chunk.blocks[x][y][z] = BlockType::AIR;
                                 moved = true;
                             }
                         }
@@ -374,12 +440,11 @@ void ChunkManager::UpdateChunkPhysics() {
 
         if (moved) {
             chunk.meshReady = false;
-            // it moved, so it might need to move again next frame. Keep awake.
+            // keep awake
             chunk.shouldStep = true;
         }
         else {
             // go to sleep
-            // nothing moved this entire scan. stop checking until the player touches something.
             chunk.shouldStep = false;
         }
     }
