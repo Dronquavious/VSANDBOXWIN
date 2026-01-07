@@ -4,10 +4,23 @@
 #include "raylib.h"
 #include "../player/player.h"
 #include "../world/chunk_manager.h"
+#include "../blocks/block_types.h"
 
+/**
+ * handles all rendering operations for the game, including
+ * world rendering, ui, and debug overlays.
+ * manages shaders, textures, and models.
+ */
 class Renderer {
 public:
+    /**
+     * initializes rendering resources (textures, shaders, models)
+     */
     void Init();
+
+    /**
+     * cleans up and unloads all rendering resources
+     */
     void Unload();
 
     // main draw calls
@@ -37,7 +50,7 @@ private:
     // environment textures
     Texture2D texClouds;
     Texture2D texHaze;
-    Texture2D textures[15]; // block textures
+    Texture2D textures[(int)BlockType::COUNT]; // block textures
 
     // animation state
     float cloudScroll;
@@ -47,7 +60,10 @@ private:
     Texture2D GenerateSkyTexture();
     Texture2D GenerateCloudTexture();
     Texture2D GenerateHazeTexture();
-    Color LerpColor(Color a, Color b, float t);
+    /**
+ * utility to linearly interpolate between two colors
+ */
+Color LerpColor(Color a, Color b, float t);
     void DrawHand(Player& player, Color tint);
 };
 
