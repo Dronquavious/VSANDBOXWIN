@@ -103,25 +103,28 @@ void main()
 }
 )";
 
+/**
+ * loads textures, shaders, models and initializes state
+ */
 void Renderer::Init() {
     handBobbing = 0.0f;
     cloudScroll = 0.0f;
 
     // load block textures using blockmanager
-    textures[BLOCK_DIRT] = BlockManager::GenDirtTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_STONE] = BlockManager::GenStoneTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_WOOD] = BlockManager::GenWoodTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_GRASS] = BlockManager::GenGrassTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_SAND] = BlockManager::GenSandTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_BEDROCK] = BlockManager::GenBedrockTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_LEAVES] = BlockManager::GenLeavesTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_GRASS_SIDE] = BlockManager::GenGrassSideTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_SNOW] = BlockManager::GenSnowTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_CACTUS] = BlockManager::GenCactusTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_SNOW_SIDE] = BlockManager::GenSnowSideTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_SNOW_LEAVES] = BlockManager::GenSnowLeavesSideTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_TORCH] = BlockManager::GenTorchTexture(BLOCK_TEX_SIZE);
-    textures[BLOCK_GLOWSTONE] = BlockManager::GenGlowstoneTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::DIRT] = BlockManager::GenDirtTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::STONE] = BlockManager::GenStoneTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::WOOD] = BlockManager::GenWoodTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::GRASS] = BlockManager::GenGrassTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::SAND] = BlockManager::GenSandTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::BEDROCK] = BlockManager::GenBedrockTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::LEAVES] = BlockManager::GenLeavesTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::GRASS_SIDE] = BlockManager::GenGrassSideTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::SNOW] = BlockManager::GenSnowTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::CACTUS] = BlockManager::GenCactusTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::SNOW_SIDE] = BlockManager::GenSnowSideTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::SNOW_LEAVES] = BlockManager::GenSnowLeavesSideTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::TORCH] = BlockManager::GenTorchTexture(BLOCK_TEX_SIZE);
+    textures[(int)BlockType::GLOWSTONE] = BlockManager::GenGlowstoneTexture(BLOCK_TEX_SIZE);
 
     Mesh mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
     blockModel = LoadModelFromMesh(mesh);
@@ -161,8 +164,11 @@ void Renderer::Init() {
 
 }
 
+/**
+ * unloads all loaded assets to free memory
+ */
 void Renderer::Unload() {
-    for (int i = 1; i <= 14; i++) UnloadTexture(textures[i]);
+    for (int i = 1; i < (int)BlockType::COUNT; i++) UnloadTexture(textures[i]);
     UnloadModel(blockModel);
     UnloadModel(skyModel);
     UnloadModel(cloudModel);
@@ -172,6 +178,9 @@ void Renderer::Unload() {
     UnloadShader(fogShader);
 }
 
+/**
+ * renders the 3d world including sky, clouds, chunks, and entities
+ */
 void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
     // calculate Sun Intensity (0.1 to 1.0)
     // drives both the Sky Color and the Shader Light Level
@@ -191,7 +200,7 @@ void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
     float lightStrength = 0.0f;
 
     // If holding Torch or Glowstone (or in the future, a lantern in left hand)
-    if (heldID == BLOCK_TORCH || heldID == BLOCK_GLOWSTONE) {
+    if (heldID == (int)BlockType::TORCH || heldID == (int)BlockType::GLOWSTONE) {
         lightStrength = 1.0f;
     }
 
@@ -309,6 +318,9 @@ void Renderer::DrawScene(Player& player, ChunkManager& world, float timeOfDay) {
     EndMode3D();
 }
 
+/**
+ * renders the first-person hand model with bobbing animation
+ */
 void Renderer::DrawHand(Player& player, Color tint) {
     bool isMoving = (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_A) || IsKeyDown(KEY_D));
     if (isMoving) handBobbing += GetFrameTime() * 10.0f;
@@ -325,10 +337,10 @@ void Renderer::DrawHand(Player& player, Color tint) {
 
     int currentID = player.GetHeldBlockID();
     Texture2D handTexture = textures[1];
-    if (currentID > 0 && currentID <= 14) handTexture = textures[currentID];
+    if (currentID > 0 && currentID < (int)BlockType::COUNT) handTexture = textures[currentID];
 
     Color handTint = tint;
-    if (currentID == BLOCK_TORCH || currentID == BLOCK_GLOWSTONE) {
+    if (currentID == (int)BlockType::TORCH || currentID == (int)BlockType::GLOWSTONE) {
         handTint = WHITE;
     }
 
@@ -339,6 +351,9 @@ void Renderer::DrawHand(Player& player, Color tint) {
     DrawModelEx(blockModel, handPos, rotationAxis, rotationAngle, scale, handTint);
 }
 
+/**
+ * renders 2d ui elements: crosshair, inventory, messages, fps
+ */
 void Renderer::DrawUI(Player& player, int screenWidth, int screenHeight, const char* msg, float msgTimer) {
     int cx = screenWidth / 2;
     int cy = screenHeight / 2;
@@ -375,9 +390,9 @@ void Renderer::DrawUI(Player& player, int screenWidth, int screenHeight, const c
         if (blockID != 0) {
             Texture2D previewTex = textures[1];
             // map real block ID to texture ID (some might share)
-            if (blockID == BLOCK_GRASS) previewTex = textures[BLOCK_GRASS_SIDE];
-            else if (blockID == BLOCK_SNOW) previewTex = textures[BLOCK_SNOW_SIDE];
-            else if (blockID <= 14) previewTex = textures[blockID];
+            if (blockID == (int)BlockType::GRASS) previewTex = textures[(int)BlockType::GRASS_SIDE];
+            else if (blockID == (int)BlockType::SNOW) previewTex = textures[(int)BlockType::SNOW_SIDE];
+            else if (blockID < (int)BlockType::COUNT) previewTex = textures[blockID];
 
             Rectangle sourceRec = { 0.0f, 0.0f, (float)previewTex.width, (float)previewTex.height };
             Rectangle destRec = { (float)x + 4, (float)startY + 4, (float)blockSize - 8, (float)blockSize - 8 };
@@ -387,6 +402,9 @@ void Renderer::DrawUI(Player& player, int screenWidth, int screenHeight, const c
     }
 }
 
+/**
+ * renders debug menu with sliders for game parameters
+ */
 void Renderer::DrawDebug(Player& player, float& daySpeed, int& timeMode) {
     int width = 280;
     int height = 210;
@@ -408,6 +426,9 @@ void Renderer::DrawDebug(Player& player, float& daySpeed, int& timeMode) {
     DrawText("Press TAB to Close", x + 20, y + 220, 10, WHITE);
 }
 
+/**
+ * generates a gradient sky texture
+ */
 Texture2D Renderer::GenerateSkyTexture() {
     const int width = 64;
     const int height = 512;
@@ -449,6 +470,9 @@ Texture2D Renderer::GenerateSkyTexture() {
     return tex;
 }
 
+/**
+ * generates a procedural cloud texture using random blobs
+ */
 Texture2D Renderer::GenerateCloudTexture() {
     const int size = 512;
     Image img = GenImageColor(size, size, BLANK);
@@ -488,6 +512,9 @@ Texture2D Renderer::GenerateCloudTexture() {
     return tex;
 }
 
+/**
+ * generates a transparency gradient for horizon haze
+ */
 Texture2D Renderer::GenerateHazeTexture() {
     const int width = 32;
     const int height = 128;
