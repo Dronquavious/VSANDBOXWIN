@@ -2,6 +2,9 @@
 #include "raymath.h"
 #include "../blocks/block_types.h"
 
+/**
+ * initializes player state and camera
+ */
 void Player::Init() {
     position = Vector3{ 16.0f, 100.0f, 16.0f };
     cameraAngleX = 0.0f;
@@ -9,17 +12,17 @@ void Player::Init() {
     isFlying = true;
     verticalVelocity = 0.0f;
 
-    // inventory init
+    // inventory setup
     inventory.selectedSlot = 0;
-    inventory.slots[0] = { BLOCK_DIRT, 64 };
-    inventory.slots[1] = { BLOCK_STONE, 64 };
-    inventory.slots[2] = { BLOCK_WOOD, 64 };
-    inventory.slots[3] = { BLOCK_GRASS, 64 };
-    inventory.slots[4] = { BLOCK_SAND, 64 };
-    inventory.slots[5] = { BLOCK_SNOW, 64 };
-    inventory.slots[6] = { BLOCK_CACTUS, 64 };
-    inventory.slots[7] = { BLOCK_TORCH, 64 };
-    inventory.slots[8] = { BLOCK_GLOWSTONE, 64 };
+    inventory.slots[0] = { (int)BlockType::DIRT, 64 };
+    inventory.slots[1] = { (int)BlockType::STONE, 64 };
+    inventory.slots[2] = { (int)BlockType::WOOD, 64 };
+    inventory.slots[3] = { (int)BlockType::GRASS, 64 };
+    inventory.slots[4] = { (int)BlockType::SAND, 64 };
+    inventory.slots[5] = { (int)BlockType::SNOW, 64 };
+    inventory.slots[6] = { (int)BlockType::CACTUS, 64 };
+    inventory.slots[7] = { (int)BlockType::TORCH, 64 };
+    inventory.slots[8] = { (int)BlockType::GLOWSTONE, 64 };
 
     gravity = 0.015f;
     jumpForce = 0.25f;
@@ -33,10 +36,13 @@ void Player::Init() {
     camera.projection = CAMERA_PERSPECTIVE;
 }
 
+/**
+ * updates position, physics, and camera view
+ */
 void Player::Update(float dt, ChunkManager& world) {
-    if (dt > 0.05f) dt = 0.05f; // lag spike fix
+    if (dt > 0.05f) dt = 0.05f; // cap timestep
 
-    // input & camera
+    // mouse look
     Vector2 mouseDelta = GetMouseDelta();
     cameraAngleX -= mouseDelta.x * 0.003f;
     cameraAngleY -= mouseDelta.y * 0.003f;
@@ -63,7 +69,7 @@ void Player::Update(float dt, ChunkManager& world) {
 
     if (IsKeyPressed(KEY_F)) isFlying = !isFlying;
 
-    // physics
+    // physics application
     if (isFlying) {
         position.x += moveVec.x;
         position.z += moveVec.z;
@@ -77,13 +83,9 @@ void Player::Update(float dt, ChunkManager& world) {
 
         position.y += verticalVelocity * dtScale;
 
-        // ground collision
+        // collision checks
         float playerHeight = 1.5f;
-        // float playerWidth = 0.3f; // unused
-
-        // int footX = (int)floor(position.x); // unused
-        // int footZ = (int)floor(position.z); // unused
-        // int blockBelowY = (int)floor(position.y - playerHeight - 0.1f); // unused
+        // float playerWidth = 0.3f; // unused variables removed
 
         if (verticalVelocity <= 0.0f) {
             bool onGround = false;
@@ -95,7 +97,7 @@ void Player::Update(float dt, ChunkManager& world) {
                     int checkZ = (int)floor(position.z + (dz * 0.5f));
                     int checkY = (int)floor(lowestY - 0.1f);
 
-                    if (world.GetBlock(checkX, checkY, checkZ) != 0) {
+                    if (world.GetBlock(checkX, checkY, checkZ) != BlockType::AIR) {
                         float blockTop = (float)checkY + 1.0f;
                         if (lowestY - 0.1f < blockTop) {
                             position.y = blockTop + playerHeight;
@@ -121,7 +123,7 @@ void Player::Update(float dt, ChunkManager& world) {
         int headY = (int)floor(position.y - 0.2f);
         int footZ = (int)floor(position.z);
 
-        if (world.GetBlock(wallX, kneeY, footZ) == 0 && world.GetBlock(wallX, headY, footZ) == 0) {
+        if (world.GetBlock(wallX, kneeY, footZ) == BlockType::AIR && world.GetBlock(wallX, headY, footZ) == BlockType::AIR) {
             position.x += moveVec.x;
         }
 
@@ -130,7 +132,7 @@ void Player::Update(float dt, ChunkManager& world) {
         int wallZ = (int)floor(testPos.z + (moveVec.z > 0 ? playerWidth : -playerWidth));
         int currentFootX = (int)floor(position.x);
 
-        if (world.GetBlock(currentFootX, kneeY, wallZ) == 0 && world.GetBlock(currentFootX, headY, wallZ) == 0) {
+        if (world.GetBlock(currentFootX, kneeY, wallZ) == BlockType::AIR && world.GetBlock(currentFootX, headY, wallZ) == BlockType::AIR) {
             position.z += moveVec.z;
         }
     }
@@ -146,6 +148,9 @@ void Player::Update(float dt, ChunkManager& world) {
     camera.target.z = camera.position.z + lookDir.z;
 }
 
+/**
+ * casts a ray from the camera to detect selected block
+ */
 void Player::UpdateRaycast(ChunkManager& world) {
     isBlockSelected = false;
     Ray ray = GetMouseRay(Vector2{ (float)GetScreenWidth() / 2, (float)GetScreenHeight() / 2 }, camera);
@@ -159,7 +164,7 @@ void Player::UpdateRaycast(ChunkManager& world) {
     for (int x = camX - radius; x <= camX + radius; x++) {
         for (int y = camY - radius; y <= camY + radius; y++) {
             for (int z = camZ - radius; z <= camZ + radius; z++) {
-                if (world.GetBlock(x, y, z, false) == 0) continue;
+                if (world.GetBlock(x, y, z, false) == BlockType::AIR) continue;
 
                 Vector3 min = { (float)x, (float)y, (float)z };
                 Vector3 max = { (float)x + 1.0f, (float)y + 1.0f, (float)z + 1.0f };
@@ -177,6 +182,9 @@ void Player::UpdateRaycast(ChunkManager& world) {
     }
 }
 
+/**
+ * processes keyboard and mouse input for interaction
+ */
 void Player::HandleInput(ChunkManager& world) {
     // select hotbar
     if (IsKeyPressed(KEY_ONE))   inventory.selectedSlot = 0;
@@ -197,7 +205,7 @@ void Player::HandleInput(ChunkManager& world) {
 
     if (isBlockSelected) {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            world.SetBlock((int)selectedBlockPos.x, (int)selectedBlockPos.y, (int)selectedBlockPos.z, 0);
+            world.SetBlock((int)selectedBlockPos.x, (int)selectedBlockPos.y, (int)selectedBlockPos.z, BlockType::AIR);
             UpdateRaycast(world);
         }
         if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
@@ -208,7 +216,7 @@ void Player::HandleInput(ChunkManager& world) {
                 int newZ = (int)(selectedBlockPos.z + round(selectedNormal.z));
                 Vector3 blockCenter = { (float)newX + 0.5f, (float)newY + 0.5f, (float)newZ + 0.5f };
                 if (Vector3Distance(camera.position, blockCenter) > 1.2f) {
-                    world.SetBlock(newX, newY, newZ, currentID);
+                    world.SetBlock(newX, newY, newZ, (BlockType)currentID);
                     UpdateRaycast(world);
                 }
             }
