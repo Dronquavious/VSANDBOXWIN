@@ -2,6 +2,7 @@
 #include "chunk_manager.h" 
 #include "raymath.h"
 #include <cstdlib>
+#include "../blocks/block_types.h"
 
 int WorldGenerator::worldSeed = 0;
 
@@ -15,7 +16,9 @@ float Hash3D(int x, int y, int z) {
 	return (h & 0xFFFF) / 65535.0f;
 }
 
-// 3d noise for caves
+/**
+ * 3d simplex-like noise function for caves and organic shapes
+ */
 float WorldGenerator::SimpleNoise3D(float x, float y, float z) {
 	int ix = (int)floorf(x);
 	int iy = (int)floorf(y);
@@ -38,6 +41,10 @@ float WorldGenerator::SimpleNoise3D(float x, float y, float z) {
 	return Lerp(y1, y2, w);
 }
 
+/**
+ * calculates terrain height using multiple noise layers
+ * combines base terrain, mountains, and detail noise
+ */
 float WorldGenerator::GetHeightNoise(int x, int z) {
 	// decides if we are in a "Flat" area or a "Hilly" area
 	float roughness = SimpleNoise3D((x + worldSeed) * 0.005f, 0, (z + worldSeed) * 0.005f);
@@ -69,17 +76,25 @@ float WorldGenerator::GetHeightNoise(int x, int z) {
 
 // --- biome logic ---
 
+/**
+ * determines biome type based on 2d noise map
+ */
 BiomeType WorldGenerator::GetBiome(int x, int z) {
 	// use simplenoise3d for smooth, organic zones
 	float noise = SimpleNoise3D((x + worldSeed) * 0.003f, 0.0f, (z + worldSeed) * 0.003f);
 
-	if (noise < 0.4f) return BIOME_SNOW;
-	if (noise > 0.6f) return BIOME_DESERT;
-	return BIOME_FOREST;
+	if (noise < 0.4f) return BiomeType::SNOW;
+	if (noise > 0.6f) return BiomeType::DESERT;
+	return BiomeType::FOREST;
 }
 
 // --- generation ---
 
+/**
+ * main generation function: populates a chunk with blocks
+ * pass 1: terrain & caves
+ * pass 2: decorations (trees, cacti)
+ */
 void WorldGenerator::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
 	int offsetX = chunkX * CHUNK_SIZE;
 	int offsetZ = chunkZ * CHUNK_SIZE;
@@ -97,24 +112,24 @@ void WorldGenerator::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
 			if (height >= CHUNK_SIZE) height = CHUNK_SIZE - 1;
 
 			for (int y = 0; y < CHUNK_SIZE; y++) {
-				int blockType = BLOCK_AIR;
+				BlockType blockType = BlockType::AIR;
 
-				if (y == 0) blockType = BLOCK_BEDROCK;
-				else if (y < height - 3) blockType = BLOCK_STONE;
+				if (y == 0) blockType = BlockType::BEDROCK;
+				else if (y < height - 3) blockType = BlockType::STONE;
 				else if (y < height) {
-					if (biome == BIOME_DESERT) blockType = BLOCK_SAND;
-					else blockType = BLOCK_DIRT;
+					if (biome == BiomeType::DESERT) blockType = BlockType::SAND;
+					else blockType = BlockType::DIRT;
 				}
 				else if (y == height) {
 					switch (biome) {
-					case BIOME_DESERT: blockType = BLOCK_SAND; break;
-					case BIOME_SNOW:   blockType = BLOCK_SNOW; break;
-					default:           blockType = BLOCK_GRASS; break;
+					case BiomeType::DESERT: blockType = BlockType::SAND; break;
+					case BiomeType::SNOW:   blockType = BlockType::SNOW; break;
+					default:           blockType = BlockType::GRASS; break;
 					}
 				}
 
 				// CAVE GENERATION
-				if (blockType != BLOCK_AIR && blockType != BLOCK_BEDROCK && y > 3) {
+				if (blockType != BlockType::AIR && blockType != BlockType::BEDROCK && y > 3) {
 					float caveNoise = SimpleNoise3D(worldX * 0.06f, y * 0.06f, worldZ * 0.06f);
 
 					// DEPTH BIAS:
@@ -123,7 +138,7 @@ void WorldGenerator::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
 					float depthBias = (float)y / (float)CHUNK_SIZE;
 					float threshold = 0.65f + (depthBias * 0.5f);
 
-					if (caveNoise > threshold) blockType = BLOCK_AIR;
+					if (caveNoise > threshold) blockType = BlockType::AIR;
 				}
 
 				chunk.blocks[x][y][z] = blockType;
@@ -141,7 +156,7 @@ void WorldGenerator::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
 			// find Top Block
 			int height = -1;
 			for (int y = CHUNK_SIZE - 1; y >= 0; y--) {
-				if (chunk.blocks[x][y][z] != BLOCK_AIR) {
+				if (chunk.blocks[x][y][z] != BlockType::AIR) {
 					height = y;
 					break;
 				}
@@ -149,19 +164,19 @@ void WorldGenerator::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
 
 			if (height <= 0 || height >= CHUNK_SIZE - 8) continue;
 
-			int topBlock = chunk.blocks[x][height][z];
+			BlockType topBlock = chunk.blocks[x][height][z];
 
 			if (x > 2 && x < CHUNK_SIZE - 3 && z > 2 && z < CHUNK_SIZE - 3) {
 				BiomeType biome = GetBiome(worldX, worldZ);
 
 				if (GetRandomValue(0, 100) < 2) {
-					if (biome == BIOME_DESERT && topBlock == BLOCK_SAND) {
+					if (biome == BiomeType::DESERT && topBlock == BlockType::SAND) {
 						PlaceCactus(chunk, x, height + 1, z);
 					}
-					else if (biome == BIOME_FOREST && topBlock == BLOCK_GRASS) {
-						PlaceTree(chunk, x, height + 1, z, BIOME_FOREST);
+					else if (biome == BiomeType::FOREST && topBlock == BlockType::GRASS) {
+						PlaceTree(chunk, x, height + 1, z, BiomeType::FOREST);
 					}
-					else if (biome == BIOME_SNOW && topBlock == BLOCK_SNOW) {
+					else if (biome == BiomeType::SNOW && topBlock == BlockType::SNOW) {
 						// exclusive snow tree
 						PlaceSnowTree(chunk, x, height + 1, z);
 					}
@@ -174,7 +189,7 @@ void WorldGenerator::GenerateChunk(Chunk& chunk, int chunkX, int chunkZ) {
 void WorldGenerator::PlaceCactus(Chunk& chunk, int x, int y, int z) {
 	int height = GetRandomValue(2, 4);
 	for (int i = 0; i < height; i++) {
-		if (y + i < CHUNK_SIZE) chunk.blocks[x][y + i][z] = BLOCK_CACTUS;
+		if (y + i < CHUNK_SIZE) chunk.blocks[x][y + i][z] = BlockType::CACTUS;
 	}
 }
 
@@ -183,7 +198,7 @@ void WorldGenerator::PlaceTree(Chunk& chunk, int x, int y, int z, BiomeType biom
 
 	// trunk
 	for (int i = 0; i < height; i++) {
-		if (y + i < CHUNK_SIZE) chunk.blocks[x][y + i][z] = BLOCK_WOOD;
+		if (y + i < CHUNK_SIZE) chunk.blocks[x][y + i][z] = BlockType::WOOD;
 	}
 
 	// leaves
@@ -201,8 +216,8 @@ void WorldGenerator::PlaceTree(Chunk& chunk, int x, int y, int z, BiomeType biom
 				int fz = z + lz;
 
 				if (fx >= 0 && fx < CHUNK_SIZE && fy >= 0 && fy < CHUNK_SIZE && fz >= 0 && fz < CHUNK_SIZE) {
-					if (chunk.blocks[fx][fy][fz] == BLOCK_AIR) {
-						chunk.blocks[fx][fy][fz] = BLOCK_LEAVES;
+					if (chunk.blocks[fx][fy][fz] == BlockType::AIR) {
+						chunk.blocks[fx][fy][fz] = BlockType::LEAVES;
 					}
 				}
 			}
@@ -215,7 +230,7 @@ void WorldGenerator::PlaceSnowTree(Chunk& chunk, int x, int y, int z) {
 
 	// trunk
 	for (int i = 0; i < height; i++) {
-		if (y + i < CHUNK_SIZE) chunk.blocks[x][y + i][z] = BLOCK_WOOD;
+		if (y + i < CHUNK_SIZE) chunk.blocks[x][y + i][z] = BlockType::WOOD;
 	}
 
 	// conical leaves
@@ -240,8 +255,8 @@ void WorldGenerator::PlaceSnowTree(Chunk& chunk, int x, int y, int z) {
 				int fz = z + lz;
 
 				if (fx >= 0 && fx < CHUNK_SIZE && fy >= 0 && fy < CHUNK_SIZE && fz >= 0 && fz < CHUNK_SIZE) {
-					if (chunk.blocks[fx][fy][fz] == BLOCK_AIR) {
-						chunk.blocks[fx][fy][fz] = BLOCK_SNOW_LEAVES;
+					if (chunk.blocks[fx][fy][fz] == BlockType::AIR) {
+						chunk.blocks[fx][fy][fz] = BlockType::SNOW_LEAVES;
 					}
 				}
 			}
